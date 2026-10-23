@@ -1997,7 +1997,7 @@ private struct ReadingPreferencesView: View {
     @AppStorage("titleMode") private var titleMode = 0
     @AppStorage("titleSize") private var titleSize = 6.0
     @AppStorage("titleTopSpacing") private var titleTopSpacing = 0.0
-    @AppStorage("titleBottomSpacing") private var titleBottomSpacing = 0.0
+    @AppStorage("titleBottomSpacing") private var titleBottomSpacing = 32.0
     @AppStorage("underlineMode") private var underlineMode = 0
     @AppStorage("readerTheme") private var theme = "wechat"
     @AppStorage("pageAnim") private var pageAnimation = 0
