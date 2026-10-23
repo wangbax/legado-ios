@@ -3,11 +3,11 @@ import UIKit
 
 @MainActor
 final class ReaderScrollGestureTests: XCTestCase {
-    func testQidianLayoutCanBeAppliedInPagedAndScrollReading() throws {
+    func testDefaultLayoutCanBeAppliedInPagedAndScrollReading() throws {
         continueAfterFailure = false
         for mode in ["4", "3"] {
             let app = launchAppearance(readingMode: mode, extraArguments: ["-readerTheme", "wechat", "-readerUseBackgroundImage", "NO"])
-            let preset = app.buttons["reader.qidianLayout"]
+            let preset = app.buttons["reader.defaultLayout"]
             XCTAssertTrue(preset.waitForExistence(timeout: 5))
             preset.tap()
             app.buttons["完成"].tap()
@@ -16,7 +16,7 @@ final class ReaderScrollGestureTests: XCTestCase {
             let surface = mode == "3" ? app.collectionViews["reader.continuous"] : app.textViews["reader.text"]
             XCTAssertTrue(surface.waitForExistence(timeout: 10))
             let before = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            before.name = "起点排版 · 模式 \(mode)"
+            before.name = "默认排版 · 模式 \(mode)"
             before.lifetime = .keepAlways
             add(before)
             if mode == "4" {

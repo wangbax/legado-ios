@@ -61,7 +61,7 @@ struct ReaderView: View {
     @AppStorage("textSize") private var fontSize = 20.0
     @AppStorage("letterSpacing") private var letterSpacing = 0.0
     @AppStorage("lineSpacingExtra") private var lineSpacing = 8.0
-    @AppStorage("readerQidianLayoutVersion") private var qidianLayoutVersion = 0
+    @AppStorage("readerQidianLayoutVersion") private var defaultLayoutVersion = 0
     @AppStorage("paragraphSpacing") private var paragraphSpacing = 10.0
     @AppStorage("paragraphIndent") private var paragraphIndent = "　　"
     @AppStorage("paddingLeft") private var paddingLeft = 16.0
@@ -203,7 +203,7 @@ struct ReaderView: View {
         }
         .animation(.easeOut(duration: 0.22), value: showsReaderMenu)
         .onAppear {
-            updateQidianTypography()
+            updateDefaultTypography()
             activity.beginReading(book)
             speech.onNextChapter = { moveSpeechToChapter(direction: 1) }
             speech.onPreviousChapter = { moveSpeechToChapter(direction: -1) }
@@ -1113,8 +1113,8 @@ struct ReaderView: View {
         ReadingNavigationStack {
             Form {
                 Section("快速排版") {
-                    Button("起点排版", systemImage: "text.alignleft", action: applyQidianLayout)
-                        .accessibilityIdentifier("reader.qidianLayout")
+                    Button("默认排版", systemImage: "text.alignleft", action: applyDefaultLayout)
+                        .accessibilityIdentifier("reader.defaultLayout")
                     HStack(spacing: 12) {
                         Button {
                             fontSize = max(5, fontSize - 1)
@@ -1389,19 +1389,19 @@ struct ReaderView: View {
         .readingPresentationDragIndicator()
     }
 
-    private func updateQidianTypography() {
-        guard qidianLayoutVersion < 1 else { return }
+    private func updateDefaultTypography() {
+        guard defaultLayoutVersion < 1 else { return }
         // Preserve the previous preset's 36-point line height when replacing
         // the scaled system fallback with full-size PingFang.
         if fontPath.isEmpty, fontSize == 20, fontWeight == 0,
            letterSpacing == 0, lineSpacing == 12, paragraphSpacing == 10 {
             lineSpacing = 8
         }
-        qidianLayoutVersion = 1
+        defaultLayoutVersion = 1
     }
 
-    private func applyQidianLayout() {
-        qidianLayoutVersion = 1
+    private func applyDefaultLayout() {
+        defaultLayoutVersion = 1
         fontSize = 20
         fontPath = ""
         fontWeight = 0
