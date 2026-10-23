@@ -3,6 +3,66 @@ import UIKit
 
 @MainActor
 final class ReaderScrollGestureTests: XCTestCase {
+    func testQidianLayoutCanBeAppliedInPagedAndScrollReading() throws {
+        continueAfterFailure = false
+        for mode in ["4", "3"] {
+            let app = launchAppearance(readingMode: mode, extraArguments: ["-readerTheme", "wechat", "-readerUseBackgroundImage", "NO"])
+            let preset = app.buttons["reader.qidianLayout"]
+            XCTAssertTrue(preset.waitForExistence(timeout: 5))
+            preset.tap()
+            app.buttons["完成"].tap()
+            let dismissed = expectation(for: NSPredicate { _, _ in !app.navigationBars["阅读样式"].exists }, evaluatedWith: nil)
+            wait(for: [dismissed], timeout: 5)
+            let surface = mode == "3" ? app.collectionViews["reader.continuous"] : app.textViews["reader.text"]
+            XCTAssertTrue(surface.waitForExistence(timeout: 10))
+            let before = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            before.name = "起点排版 · 模式 \(mode)"
+            before.lifetime = .keepAlways
+            add(before)
+            if mode == "4" {
+                let viewport = app.otherElements["reader.viewport"]
+                XCTAssertTrue(viewport.exists)
+                try assertPageBottomIsBlank(viewport)
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
+                let progress = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "2/")).firstMatch
+                let progressed = progress.waitForExistence(timeout: 5)
+                attachScreenshot(app)
+                XCTAssertTrue(progressed)
+                XCTAssertGreaterThan(surface.frame.minY, 50)
+            } else {
+                surface.swipeUp()
+                attachScreenshot(app)
+            }
+            app.terminate()
+        }
+    }
+
+    private func assertPageBottomIsBlank(_ surface: XCUIElement) throws {
+        let image = try XCTUnwrap(surface.screenshot().image.cgImage)
+        let scale = CGFloat(image.height) / surface.frame.height
+        // With this demo chapter and preset, the next line doesn't fit on page
+        // one. Its ink must not appear in the unused bottom 20 points.
+        let strip = try XCTUnwrap(image.cropping(to: CGRect(
+            x: 0, y: CGFloat(image.height) - 20 * scale,
+            width: CGFloat(image.width), height: 19 * scale
+        )))
+        var bytes = [UInt8](repeating: 0, count: strip.width * strip.height * 4)
+        try bytes.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(
+                data: buffer.baseAddress, width: strip.width, height: strip.height,
+                bitsPerComponent: 8, bytesPerRow: strip.width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+            ))
+            context.draw(strip, in: CGRect(x: 0, y: 0, width: strip.width, height: strip.height))
+        }
+        let background = Array(bytes.prefix(3)).map(Int.init)
+        let ink = stride(from: 0, to: bytes.count, by: 4).filter { pixel in
+            (0..<3).contains { abs(Int(bytes[pixel + $0]) - background[$0]) > 12 }
+        }.count
+        XCTAssertEqual(ink, 0, "Page one must hide the next page's first line rather than repeat it")
+    }
+
     func testBackgroundSwitchRestoresPresetWithoutDeletingPhoto() throws {
         try exerciseBackgroundSwitch(readingMode: "0")
     }
@@ -161,9 +221,9 @@ final class ReaderScrollGestureTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["第一章 · 雨夜"].firstMatch.exists)
     }
 
-    private func launchAppearance(readingMode: String = "0", usesLegacyUI: Bool = false) -> XCUIApplication {
+    private func launchAppearance(readingMode: String = "0", usesLegacyUI: Bool = false, extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-uiDemo", "-uiDemoReader", "-uiDemoReaderStyle", "-pageAnim", readingMode, "-themeMode", "1", "-textFont", ""]
+        app.launchArguments = ["-uiDemo", "-uiDemoReader", "-uiDemoReaderStyle", "-pageAnim", readingMode, "-themeMode", "1", "-textFont", ""] + extraArguments
         if usesLegacyUI { app.launchArguments.append("-uiLegacyCompatibility") }
         app.launch()
         XCTAssertTrue(app.navigationBars["阅读样式"].waitForExistence(timeout: 20))
@@ -227,6 +287,7 @@ final class ReaderScrollGestureTests: XCTestCase {
         let next = expectation(for: NSPredicate { _, _ in page.label.hasPrefix("2/") }, evaluatedWith: nil)
         wait(for: [next], timeout: 5)
         XCTAssertEqual(body.value as? String, chapter)
+        attachScreenshot(app)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap()
         let previous = expectation(for: NSPredicate { _, _ in page.label.hasPrefix("1/") }, evaluatedWith: nil)
         wait(for: [previous], timeout: 5)

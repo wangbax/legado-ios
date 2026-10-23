@@ -59,9 +59,10 @@ struct ReaderView: View {
     @State private var isSavingBookmark = false
     @ScaledMetric(relativeTo: .body) private var toolbarIconSize = 21
     @AppStorage("textSize") private var fontSize = 20.0
-    @AppStorage("letterSpacing") private var letterSpacing = 0.1
-    @AppStorage("lineSpacingExtra") private var lineSpacing = 12.0
-    @AppStorage("paragraphSpacing") private var paragraphSpacing = 2.0
+    @AppStorage("letterSpacing") private var letterSpacing = 0.0
+    @AppStorage("lineSpacingExtra") private var lineSpacing = 8.0
+    @AppStorage("readerQidianLayoutVersion") private var qidianLayoutVersion = 0
+    @AppStorage("paragraphSpacing") private var paragraphSpacing = 10.0
     @AppStorage("paragraphIndent") private var paragraphIndent = "　　"
     @AppStorage("paddingLeft") private var paddingLeft = 16.0
     @AppStorage("paddingRight") private var paddingRight = 16.0
@@ -74,22 +75,22 @@ struct ReaderView: View {
     @AppStorage("titleTopSpacing") private var titleTopSpacing = 0.0
     @AppStorage("titleBottomSpacing") private var titleBottomSpacing = 0.0
     @AppStorage("underlineMode") private var underlineMode = 0
-    @AppStorage("headerPaddingBottom") private var headerPaddingBottom = 0.0
-    @AppStorage("headerPaddingLeft") private var headerPaddingLeft = 16.0
-    @AppStorage("headerPaddingRight") private var headerPaddingRight = 16.0
+    @AppStorage("headerPaddingBottom") private var headerPaddingBottom = 10.0
+    @AppStorage("headerPaddingLeft") private var headerPaddingLeft = 20.0
+    @AppStorage("headerPaddingRight") private var headerPaddingRight = 20.0
     @AppStorage("headerPaddingTop") private var headerPaddingTop = 0.0
     @AppStorage("footerPaddingBottom") private var footerPaddingBottom = 6.0
-    @AppStorage("footerPaddingLeft") private var footerPaddingLeft = 16.0
-    @AppStorage("footerPaddingRight") private var footerPaddingRight = 16.0
+    @AppStorage("footerPaddingLeft") private var footerPaddingLeft = 20.0
+    @AppStorage("footerPaddingRight") private var footerPaddingRight = 20.0
     @AppStorage("footerPaddingTop") private var footerPaddingTop = 6.0
     @AppStorage("showHeaderLine") private var showHeaderLine = false
-    @AppStorage("showFooterLine") private var showFooterLine = true
-    @AppStorage("tipHeaderLeft") private var tipHeaderLeft = 2
+    @AppStorage("showFooterLine") private var showFooterLine = false
+    @AppStorage("tipHeaderLeft") private var tipHeaderLeft = 1
     @AppStorage("tipHeaderMiddle") private var tipHeaderMiddle = 0
-    @AppStorage("tipHeaderRight") private var tipHeaderRight = 3
-    @AppStorage("tipFooterLeft") private var tipFooterLeft = 1
+    @AppStorage("tipHeaderRight") private var tipHeaderRight = 0
+    @AppStorage("tipFooterLeft") private var tipFooterLeft = 6
     @AppStorage("tipFooterMiddle") private var tipFooterMiddle = 0
-    @AppStorage("tipFooterRight") private var tipFooterRight = 6
+    @AppStorage("tipFooterRight") private var tipFooterRight = 8
     @AppStorage("headerMode") private var headerMode = 0
     @AppStorage("footerMode") private var footerMode = 0
     @AppStorage("readerTheme") private var theme = "wechat"
@@ -109,7 +110,7 @@ struct ReaderView: View {
     @AppStorage("readerFullJustify") private var fullJustify = true
     @AppStorage("readerKeepScreenOn") private var keepScreenOn = false
     @AppStorage("readerHideHomeIndicator") private var hideHomeIndicator = false
-    @AppStorage("readerHideStatusBar") private var hideStatusBar = false
+    @AppStorage("readerHideStatusBar") private var hideStatusBar = true
     @AppStorage("readerShowBrightness") private var showBrightness = true
     @AppStorage("readerBrightness") private var storedReaderBrightness = 0.0
     @AppStorage("readerUseBackgroundImage") private var useBackgroundImage = false
@@ -202,6 +203,7 @@ struct ReaderView: View {
         }
         .animation(.easeOut(duration: 0.22), value: showsReaderMenu)
         .onAppear {
+            updateQidianTypography()
             activity.beginReading(book)
             speech.onNextChapter = { moveSpeechToChapter(direction: 1) }
             speech.onPreviousChapter = { moveSpeechToChapter(direction: -1) }
@@ -449,7 +451,7 @@ struct ReaderView: View {
         } else {
             VStack(spacing: 0) {
                 if headerVisible { readerTipBar(isHeader: true) }
-                readerSurface
+                readerSurface.clipped()
                 if footerVisible { readerTipBar(isHeader: false) }
             }
             .frame(maxWidth: readingColumnMaxWidth)
@@ -731,8 +733,8 @@ struct ReaderView: View {
             Text(readerTipText(values[2], date: date))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .font(.system(size: 12))
-        .foregroundStyle(foregroundColor)
+        .font(.system(size: isHeader ? 11 : 10))
+        .foregroundStyle(foregroundColor.opacity(0.48))
         .lineLimit(1)
         .padding(.leading, isHeader ? headerPaddingLeft : footerPaddingLeft)
         .padding(.trailing, isHeader ? headerPaddingRight : footerPaddingRight)
@@ -1111,6 +1113,8 @@ struct ReaderView: View {
         ReadingNavigationStack {
             Form {
                 Section("快速排版") {
+                    Button("起点排版", systemImage: "text.alignleft", action: applyQidianLayout)
+                        .accessibilityIdentifier("reader.qidianLayout")
                     HStack(spacing: 12) {
                         Button {
                             fontSize = max(5, fontSize - 1)
@@ -1143,7 +1147,7 @@ struct ReaderView: View {
                             .font(.subheadline)
                         Spacer(minLength: 8)
                         readerChoiceChip("紧凑", selected: lineSpacing <= 7) { lineSpacing = 6 }
-                        readerChoiceChip("标准", selected: lineSpacing > 7 && lineSpacing < 18) { lineSpacing = 12 }
+                        readerChoiceChip("标准", selected: lineSpacing > 7 && lineSpacing < 18) { lineSpacing = 8 }
                         readerChoiceChip("宽松", selected: lineSpacing >= 18) { lineSpacing = 22 }
                     }
                     Toggle("两端对齐", isOn: $fullJustify)
@@ -1383,6 +1387,52 @@ struct ReaderView: View {
         }
         .readingPresentationDetents([.medium])
         .readingPresentationDragIndicator()
+    }
+
+    private func updateQidianTypography() {
+        guard qidianLayoutVersion < 1 else { return }
+        // Preserve the previous preset's 36-point line height when replacing
+        // the scaled system fallback with full-size PingFang.
+        if fontPath.isEmpty, fontSize == 20, fontWeight == 0,
+           letterSpacing == 0, lineSpacing == 12, paragraphSpacing == 10 {
+            lineSpacing = 8
+        }
+        qidianLayoutVersion = 1
+    }
+
+    private func applyQidianLayout() {
+        qidianLayoutVersion = 1
+        fontSize = 20
+        fontPath = ""
+        fontWeight = 0
+        letterSpacing = 0
+        lineSpacing = 8
+        paragraphSpacing = 10
+        paragraphIndent = "　　"
+        paddingLeft = 16
+        paddingRight = 16
+        paddingTop = 6
+        paddingBottom = 6
+        fullJustify = true
+        hideStatusBar = true
+        headerMode = 1
+        headerPaddingTop = 0
+        headerPaddingBottom = 10
+        headerPaddingLeft = 20
+        headerPaddingRight = 20
+        tipHeaderLeft = 1
+        tipHeaderMiddle = 0
+        tipHeaderRight = 0
+        showHeaderLine = false
+        footerMode = 0
+        footerPaddingTop = 6
+        footerPaddingBottom = 6
+        footerPaddingLeft = 20
+        footerPaddingRight = 20
+        tipFooterLeft = 6
+        tipFooterMiddle = 0
+        tipFooterRight = 8
+        showFooterLine = false
     }
 
     private static let pageAnimationChoices: [(value: Int, title: String, icon: String)] = [

@@ -6,6 +6,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CA1000000000000000000001 /* OnlineBookSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000001; };
+		CA1000000000000000000002 /* OnlineSourceBrowserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000002; };
+		CA1000000000000000000003 /* RuleImportDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000003; };
 		DA1000000000000000000002 /* AppearanceContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2000000000000000000002; };
 		DA1000000000000000000001 /* DarkModeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA2000000000000000000001; };
 		B10000000000000000000050 = {isa = PBXBuildFile; fileRef = B20000000000000000000050; };
@@ -126,6 +129,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CA2000000000000000000001 /* OnlineBookSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineBookSourcesView.swift; sourceTree = "<group>"; };
+		CA2000000000000000000002 /* OnlineSourceBrowserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderTests/OnlineSourceBrowserTests.swift; sourceTree = SOURCE_ROOT; };
+		CA2000000000000000000003 /* RuleImportDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleImportDownloader.swift; sourceTree = "<group>"; };
 		DA2000000000000000000002 /* AppearanceContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderTests/AppearanceContrastTests.swift; sourceTree = SOURCE_ROOT; };
 		DA2000000000000000000001 /* DarkModeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderUITests/DarkModeUITests.swift; sourceTree = SOURCE_ROOT; };
 		B20000000000000000000050 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderUITests/ReaderScrollGestureTests.swift; sourceTree = SOURCE_ROOT; };
@@ -265,6 +271,7 @@
 		D40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				CA2000000000000000000002 /* OnlineSourceBrowserTests.swift */,
 				AA2200000000000000000001 /* SourceEditorView.swift */,
 				AA2200000000000000000002 /* ReplaceRuleEditorView.swift */,
 				AA2200000000000000000003 /* SyntaxCodeEditor.swift */,
@@ -314,6 +321,7 @@
 		A30000000000000000000002 /* Sources Feature */ = {
 			isa = PBXGroup;
 			children = (
+				CA2000000000000000000001 /* OnlineBookSourcesView.swift */,
 				A20000000000000000000003 /* SourceLibraryModel.swift */,
 				A20000000000000000000004 /* SourceManagementView.swift */,
 				A2000000000000000000000D /* SourceDebugView.swift */,
@@ -433,6 +441,7 @@
 			isa = PBXGroup;
 			children = (
 				F21000000000000000000004 /* RuleImportInput.swift */,
+				CA2000000000000000000003 /* RuleImportDownloader.swift */,
 				C20000000000000000000004 /* BookSourceValidator.swift */,
 				C20000000000000000000005 /* BookSourceImporter.swift */,
 				C20000000000000000000029 /* RSSSourceImporter.swift */,
@@ -685,11 +694,12 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		B30000000000000000000050 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000050, AA1100000000000000000009, AA1100000000000000000010, DA1000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
-		B30000000000000000000030 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000030, BC1000000000000000000001, DA1000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
+		B30000000000000000000030 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000030, BC1000000000000000000001, DA1000000000000000000002, CA1000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
 		D30000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA1000000000000000000001 /* OnlineBookSourcesView.swift in Sources */,
 				AA1100000000000000000001 /* SourceEditorView.swift in Sources */,
 				AA1100000000000000000002 /* ReplaceRuleEditorView.swift in Sources */,
 				AA1100000000000000000003 /* SyntaxCodeEditor.swift in Sources */,
@@ -735,6 +745,7 @@
 				F11000000000000000000002 /* LocalFileService.swift in Sources */,
 				F11000000000000000000003 /* BookSourceEditorDocument.swift in Sources */,
 				F11000000000000000000004 /* RuleImportInput.swift in Sources */,
+				CA1000000000000000000003 /* RuleImportDownloader.swift in Sources */,
 				A10000000000000000000013 /* CacheManagementView.swift in Sources */,
 				A10000000000000000000014 /* SourceSwitchView.swift in Sources */,
 				A10000000000000000000015 /* RSSLibraryModel.swift in Sources */,

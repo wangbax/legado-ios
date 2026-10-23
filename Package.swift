@@ -38,7 +38,7 @@ let package = Package(
             path: "App/Features",
             exclude: [
                 "Activity", "Explore", "RSS", "TTS", "Settings",
-                "Sources/SourceManagementView.swift", "Sources/SourceDebugView.swift", "Sources/SourceLoginView.swift", "Sources/SourceEditorView.swift",
+                "Sources/SourceManagementView.swift", "Sources/SourceDebugView.swift", "Sources/SourceLoginView.swift", "Sources/SourceEditorView.swift", "Sources/OnlineBookSourcesView.swift",
                 "Rules/ReplaceRuleManagementView.swift", "Rules/ReplaceRuleEditorView.swift", "Rules/RuleSubscriptionView.swift", "Rules/TxtTocRuleManagementView.swift", "Rules/Editor",
                 "Books/BookDetailView.swift", "Books/LocalBookDetailView.swift", "Books/SourceSwitchView.swift",
                 "Reader/ReaderAppearance.swift", "Reader/ReaderSpeechController.swift", "Reader/ReaderSupport.swift",

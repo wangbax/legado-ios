@@ -1,4 +1,5 @@
 import ImageIO
+import CoreText
 import SwiftUI
 import UIKit
 import XCTest
@@ -158,6 +159,89 @@ final class ReaderBookmarkPersistenceTests: XCTestCase {
 
 @MainActor
 final class ReaderScrollGeometryTests: XCTestCase {
+    func testDefaultChineseGlyphsUseTheRequestedFontSize() throws {
+        let config = configuration(fontSize: 20)
+        let text = NSAttributedString(string: "天地玄黄", attributes: ReaderTypography(configuration: config).bodyAttributes)
+        let line = CTLineCreateWithAttributedString(text)
+        XCTAssertEqual(CTLineGetTypographicBounds(line, nil, nil, nil), 4 * config.fontSize, accuracy: 0.1,
+                       "Chinese glyphs should retain the requested em size instead of shrinking through font fallback")
+        let paragraph = try XCTUnwrap(text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        XCTAssertEqual(paragraph.firstLineHeadIndent, 2 * config.fontSize, accuracy: 0.1,
+                       "The two-character indent should match the actual Chinese glyph size")
+    }
+
+    func testPagedRangesCoverAllTextWithoutSplittingCharactersOrCuttingLines() throws {
+        for size in [15.0, 20.0, 28.0, 50.0] {
+            let config = configuration(fontSize: size, pageAnimation: 4)
+            let view: UITextView
+            if #available(iOS 16.0, *) { view = UITextView(usingTextLayoutManager: false) }
+            else { view = UITextView(frame: .zero) }
+            view.frame = CGRect(x: 0, y: 0, width: 402, height: 713)
+            view.textContainerInset = UIEdgeInsets(top: 6, left: 16, bottom: 6, right: 16)
+            view.attributedText = NSAttributedString(string: config.text, attributes: ReaderTypography(configuration: config).bodyAttributes)
+            view.layoutIfNeeded()
+
+            let pages = ReaderPageLayout.pages(in: view)
+            XCTAssertGreaterThan(pages.count, 1)
+            var end = 0
+            let text = config.text as NSString
+            for page in pages {
+                XCTAssertEqual(page.renderedRange.location, end, "No text may be skipped or repeated between pages")
+                XCTAssertEqual(text.rangeOfComposedCharacterSequence(at: page.renderedRange.location).location,
+                               page.renderedRange.location, "A page cannot start inside an emoji or composed character")
+                XCTAssertLessThanOrEqual(page.visibleHeight, view.bounds.height - view.textContainerInset.bottom + 0.5)
+                end = NSMaxRange(page.renderedRange)
+            }
+            XCTAssertEqual(end, text.length)
+        }
+    }
+
+    func testPagedTurnsStartAtACompleteLineAndReturnToTheSamePosition() async throws {
+        let config = configuration(fontSize: 20, pageAnimation: 4)
+        let coordinator = ReaderTextView.Coordinator(parent: config)
+        let view: UITextView
+        if #available(iOS 16.0, *) { view = UITextView(usingTextLayoutManager: false) }
+        else { view = UITextView(frame: .zero) }
+        view.frame = CGRect(x: 0, y: 0, width: 402, height: 713)
+        view.contentInsetAdjustmentBehavior = .never
+        view.textContainerInset = UIEdgeInsets(top: 6, left: 16, bottom: 6, right: 16)
+        view.textContainer.lineFragmentPadding = 4
+        view.attributedText = NSAttributedString(string: config.text, attributes: ReaderTypography(configuration: config).bodyAttributes)
+        view.delegate = coordinator
+        coordinator.installDisplayLink(for: view)
+        let window = UIWindow(frame: view.frame)
+        let controller = UIViewController()
+        controller.view = view
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        view.layoutIfNeeded()
+        defer { coordinator.invalidate(); window.isHidden = true }
+
+        let next = UISwipeGestureRecognizer()
+        next.direction = .left
+        let previous = UISwipeGestureRecognizer()
+        previous.direction = .right
+        var offsets: [CGFloat] = [view.contentOffset.y]
+        let pages = ReaderPageLayout.pages(in: view)
+        for page in pages.dropFirst() {
+            coordinator.perform(NSSelectorFromString("swiped:"), with: next)
+            coordinator.updateLoadingFooter(in: view, visible: false)
+            view.layoutIfNeeded()
+            offsets.append(view.contentOffset.y)
+            XCTAssertEqual(view.contentOffset.y, page.offset, accuracy: 0.5)
+            // A used rect includes line spacing, so the preceding line's blank
+            // tail may overlap the top inset. Inspect this page's first glyph.
+            let glyph = view.layoutManager.glyphIndexForCharacter(at: page.renderedRange.location)
+            let first = view.layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+            XCTAssertGreaterThanOrEqual(first.minY + view.textContainerInset.top - view.contentOffset.y,
+                                        view.textContainerInset.top - 0.5, "A new page must show the whole first line")
+        }
+        for expected in offsets.dropLast().reversed() {
+            coordinator.perform(NSSelectorFromString("swiped:"), with: previous)
+            XCTAssertEqual(view.contentOffset.y, expected, accuracy: 0.5)
+        }
+    }
+
     func testPrependingAndRecyclingStayWithinOnePhysicalPixel() async throws {
         let chapters = (4...6).map { chapter($0) }
         let fixture = host(chapters: chapters, active: 5)
@@ -272,14 +356,14 @@ final class ReaderScrollGeometryTests: XCTestCase {
               onRetainChapters: { _ in })
     }
 
-    private func configuration(fontSize: Double = 20) -> ReaderTextView {
-        .init(text: "", title: "", previousTitle: nil, previousText: "", isPreviousReady: false,
+    private func configuration(fontSize: Double = 20, pageAnimation: Int = 3) -> ReaderTextView {
+        .init(text: pageAnimation == 3 ? "" : String(repeating: "正文包含中文、英文 words 与家庭表情👨‍👩‍👧‍👦，用于验证分页时正文不会被截断。\n", count: 90), title: "", previousTitle: nil, previousText: "", isPreviousReady: false,
               continuationTitle: nil, continuationText: "", isContinuationReady: false, isVolume: false,
               fontSize: fontSize, fontPath: "", letterSpacing: 0, lineSpacing: 8, paragraphSpacing: 12,
               paragraphIndent: "　　", paddingLeft: 20, paddingRight: 20, paddingTop: 16, paddingBottom: 16,
               headerInset: 0, footerInset: 0, fontWeight: 0, titleMode: 0, titleSize: 4,
               titleTopSpacing: 16, titleBottomSpacing: 24, underlineMode: 0, isSelectable: false,
-              fullJustify: true, pageAnimation: 3, isEInkMode: false, clickActions: Array(repeating: 0, count: 9),
+              fullJustify: true, pageAnimation: pageAnimation, isEInkMode: false, clickActions: Array(repeating: 0, count: 9),
               backgroundColor: .white, foregroundColor: .black, requestedPosition: 0, jumpPosition: nil,
               renderRevision: 0, readerPosition: .constant(0), pageRanges: .constant([]),
               currentPage: .constant(1), totalPages: .constant(1), isAutoReading: false,

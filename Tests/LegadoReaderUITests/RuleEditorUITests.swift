@@ -2,6 +2,20 @@ import XCTest
 
 @MainActor
 final class RuleEditorUITests: XCTestCase {
+    func testOnlineSourceEntryOpensTheInternalBrowser() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiDemo", "-uiDemoTab", "sources"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["书源"].waitForExistence(timeout: 20))
+        app.buttons["更多"].firstMatch.tap()
+        app.buttons["在线书源"].tap()
+        XCTAssertTrue(app.navigationBars["在线书源"].waitForExistence(timeout: 10))
+        app.staticTexts["开源阅读 · 九月书源更新"].tap()
+        XCTAssertTrue(app.navigationBars["阅读书源分享"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
+        attach(app, name: "Online source catalog in the internal browser")
+    }
+
     func testBookshelfTXTFilePickerImportsTXTAndDisablesJSON() throws {
         try exerciseLocalTXTImport(fromFileManagement: false)
     }
