@@ -559,7 +559,7 @@ struct ReaderTypography {
             body[.underlineColor] = c.foregroundColor
         }
         bodyAttributes = body
-        let headingFont = ReaderFontStore.resolvedFont(at: c.fontPath, size: CGFloat(max(5, c.fontSize + c.titleSize)), weight: c.fontWeight)
+        let headingFont = ReaderFontStore.resolvedFont(at: c.fontPath, size: CGFloat(max(5, c.fontSize + c.titleSize)), weight: 1)
         let heading = NSMutableParagraphStyle()
         heading.alignment = c.titleMode == 1 ? .center : .left
         heading.paragraphSpacingBefore = CGFloat(c.titleTopSpacing)

@@ -71,7 +71,7 @@ struct ReaderView: View {
     @AppStorage("textBold") private var fontWeight = 0
     @AppStorage("textFont") private var fontPath = ""
     @AppStorage("titleMode") private var titleMode = 0
-    @AppStorage("titleSize") private var titleSize = 0.0
+    @AppStorage("titleSize") private var titleSize = 6.0
     @AppStorage("titleTopSpacing") private var titleTopSpacing = 0.0
     @AppStorage("titleBottomSpacing") private var titleBottomSpacing = 0.0
     @AppStorage("underlineMode") private var underlineMode = 0
@@ -1390,21 +1390,23 @@ struct ReaderView: View {
     }
 
     private func updateDefaultTypography() {
-        guard defaultLayoutVersion < 1 else { return }
+        guard defaultLayoutVersion < 2 else { return }
         // Preserve the previous preset's 36-point line height when replacing
         // the scaled system fallback with full-size PingFang.
-        if fontPath.isEmpty, fontSize == 20, fontWeight == 0,
+        if defaultLayoutVersion < 1, fontPath.isEmpty, fontSize == 20, fontWeight == 0,
            letterSpacing == 0, lineSpacing == 12, paragraphSpacing == 10 {
             lineSpacing = 8
         }
-        defaultLayoutVersion = 1
+        if titleSize == 0 { titleSize = 6 }
+        defaultLayoutVersion = 2
     }
 
     private func applyDefaultLayout() {
-        defaultLayoutVersion = 1
+        defaultLayoutVersion = 2
         fontSize = 20
         fontPath = ""
         fontWeight = 0
+        titleSize = 6
         letterSpacing = 0
         lineSpacing = 8
         paragraphSpacing = 10

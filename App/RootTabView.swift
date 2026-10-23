@@ -1995,7 +1995,7 @@ private struct ReadingPreferencesView: View {
     @AppStorage("paddingBottom") private var paddingBottom = 6.0
     @AppStorage("textBold") private var fontWeight = 0
     @AppStorage("titleMode") private var titleMode = 0
-    @AppStorage("titleSize") private var titleSize = 0.0
+    @AppStorage("titleSize") private var titleSize = 6.0
     @AppStorage("titleTopSpacing") private var titleTopSpacing = 0.0
     @AppStorage("titleBottomSpacing") private var titleBottomSpacing = 0.0
     @AppStorage("underlineMode") private var underlineMode = 0
