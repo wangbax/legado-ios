@@ -216,6 +216,27 @@ struct BookSourceSwitchServiceTests {
         #expect(report.book.durChapterPos == 88)
         #expect(report.verifiedContent?.content == "验证后的正文")
     }
+
+    @Test func skippingAMatchedVolumeMarksThePreviewAsApproximate() async throws {
+        var current = Book(bookUrl: "old", name: "书", origin: "old")
+        current.durChapterTitle = "卷二"
+        current.durChapterPos = 88
+        var volume = BookChapter(url: "volume", title: "卷二", bookUrl: "new", index: 0)
+        volume.isVolume = true
+        let chapters = [volume, BookChapter(url: "body", title: "第二章", bookUrl: "new", index: 1)]
+        let loader = StubSwitchLoader(chapters: chapters)
+        let service = BookSourceSwitchService(detailLoader: loader, chapterLoader: loader,
+                                              contentLoader: SwitchContentLoader(),
+                                              chapterRepository: InMemoryBookChapterRepository())
+        let report = try #require(await service.prepareSwitch(current: current,
+            candidate: SearchBook(bookURL: "new", origin: "new", originName: "新源", type: 0, name: "书"),
+            source: BookSource(bookSourceUrl: "new", bookSourceName: "新源"), persistChapters: false))
+        #expect(!report.exactChapterMatch)
+        #expect(report.book.durChapterIndex == 1)
+        #expect(report.book.durChapterTitle == "第二章")
+        #expect(report.book.durChapterPos == 0)
+        #expect(report.verifiedContent?.content == "验证后的正文")
+    }
 }
 
 private struct SwitchContentLoader: ChapterContentLoading {

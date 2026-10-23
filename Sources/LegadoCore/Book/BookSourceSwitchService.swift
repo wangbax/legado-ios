@@ -202,7 +202,8 @@ public actor BookSourceSwitchService {
         current: Book,
         candidate: SearchBook,
         source: BookSource,
-        now: Int64? = nil
+        now: Int64? = nil,
+        persistChapters: Bool = true
     ) async -> BookSourceSwitchReport? {
         guard !Task.isCancelled else { return nil }
         let detail = await detailLoader.loadDetail(searchBook: candidate, source: source)
@@ -224,6 +225,7 @@ public actor BookSourceSwitchService {
             result.book.durChapterIndex = readableIndex
             result.book.durChapterTitle = result.chapters[readableIndex].title
             result.book.durChapterPos = 0
+            result.exactChapterMatch = false
         }
         let chapter = result.chapters[readableIndex]
         let nextURL = result.chapters.dropFirst(readableIndex + 1).first(where: { !$0.isVolume })?.url
@@ -235,6 +237,11 @@ public actor BookSourceSwitchService {
               !content.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         result.verifiedContent = content
         result.diagnostics += content.diagnostics
+        return persistChapters ? await persistPreparedSwitch(result) : result
+    }
+
+    public func persistPreparedSwitch(_ report: BookSourceSwitchReport) async -> BookSourceSwitchReport {
+        var result = report
         do {
             try await chapterRepository.save(result.chapters, bookURL: result.book.bookUrl)
         } catch {

@@ -3,6 +3,61 @@ import UIKit
 
 @MainActor
 final class ReaderScrollGestureTests: XCTestCase {
+    func testSourceSwitchPreviewsCurrentChapterUntilExplicitConfirmation() {
+        continueAfterFailure = false
+        let app = launchSourceSwitchPreview()
+        let confirm = app.buttons["sourceSwitch.confirm"]
+        XCTAssertFalse(confirm.isEnabled)
+        let first = app.buttons["sourceSwitch.candidate.https://science.example"]
+        let second = app.buttons["sourceSwitch.candidate.https://audio.example"]
+        first.tap()
+        waitForSourcePreview("远方书库的本章正文", in: app)
+        XCTAssertTrue(app.navigationBars["为《长夜里的灯》换源"].exists)
+        XCTAssertEqual(app.staticTexts["sourceSwitch.preview.mapping"].label, "章节已匹配")
+        XCTAssertEqual(app.staticTexts["sourceSwitch.preview.chapter"].label, "第二章 · 灯塔")
+        XCTAssertTrue(confirm.isEnabled)
+        attachScreenshot(app)
+
+        second.tap()
+        waitForSourcePreview("听见故事的本章正文", in: app)
+        XCTAssertTrue(app.navigationBars["为《长夜里的灯》换源"].exists)
+        XCTAssertEqual(app.staticTexts["sourceSwitch.preview.mapping"].label, "按进度定位")
+        first.tap()
+        waitForSourcePreview("远方书库的本章正文", in: app)
+        confirm.tap()
+        let dismissed = expectation(for: NSPredicate { _, _ in
+            !app.navigationBars["为《长夜里的灯》换源"].exists
+        }, evaluatedWith: nil)
+        wait(for: [dismissed], timeout: 5)
+        XCTAssertEqual(app.staticTexts["sourceSwitch.demo.current"].label, "当前书源：远方书库")
+    }
+
+    func testCancelSourcePreviewKeepsTheOriginalSource() {
+        continueAfterFailure = false
+        let app = launchSourceSwitchPreview()
+        app.buttons["sourceSwitch.candidate.https://science.example"].tap()
+        waitForSourcePreview("远方书库的本章正文", in: app)
+        app.buttons["取消"].tap()
+        let current = app.staticTexts["sourceSwitch.demo.current"]
+        XCTAssertTrue(current.waitForExistence(timeout: 5))
+        XCTAssertEqual(current.label, "当前书源：经典文学馆")
+        XCTAssertFalse(app.navigationBars["为《长夜里的灯》换源"].exists)
+    }
+
+    private func launchSourceSwitchPreview() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiDemo", "-uiDemoSourceSwitch", "-themeMode", "1"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["为《长夜里的灯》换源"].waitForExistence(timeout: 20))
+        return app
+    }
+
+    private func waitForSourcePreview(_ text: String, in app: XCUIApplication) {
+        let content = app.staticTexts["sourceSwitch.preview.content"]
+        let loaded = expectation(for: NSPredicate { _, _ in content.exists && content.label.contains(text) }, evaluatedWith: nil)
+        wait(for: [loaded], timeout: 10)
+    }
+
     func testDefaultLayoutCanBeAppliedInPagedAndScrollReading() throws {
         continueAfterFailure = false
         for mode in ["4", "3"] {
