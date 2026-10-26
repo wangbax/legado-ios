@@ -89,11 +89,7 @@ public struct BookSourceProgressMapper: Sendable {
         migrated.totalChapterNum = chapters.count
         migrated.latestChapterTitle = chapters.last(where: { !$0.isVolume })?.title ?? chapters.last?.title
 
-        let oldTitle = current.durChapterTitle ?? ""
-        let normalizedOldTitle = normalize(oldTitle)
-        let exactIndex = chapters.firstIndex { chapter in
-            chapter.title == oldTitle || (!normalizedOldTitle.isEmpty && normalize(chapter.title) == normalizedOldTitle)
-        }
+        let exactIndex = matchingChapterIndex(title: current.durChapterTitle ?? "", chapters: chapters)
         let resolvedIndex: Int
         if let exactIndex {
             resolvedIndex = exactIndex
@@ -111,6 +107,26 @@ public struct BookSourceProgressMapper: Sendable {
         migrated.durChapterTitle = chapters.indices.contains(resolvedIndex) ? chapters[resolvedIndex].title : nil
         migrated.durChapterTime = current.durChapterTime
         return .init(book: migrated, chapters: chapters, exactChapterMatch: exactIndex != nil)
+    }
+
+    private func matchingChapterIndex(title: String, chapters: [BookChapter]) -> Int? {
+        let normalizedTitle = normalize(title)
+        guard !normalizedTitle.isEmpty else { return nil }
+        let readable = chapters.indices.filter { !chapters[$0].isVolume }
+        let fullMatches = readable.filter { normalize(chapters[$0].title) == normalizedTitle }
+        if !fullMatches.isEmpty { return fullMatches.count == 1 ? fullMatches.first : nil }
+
+        let name = chapterName(title)
+        guard !name.isEmpty else { return nil }
+        let nameMatches = readable.filter { chapterName(chapters[$0].title) == name }
+        return nameMatches.count == 1 ? nameMatches.first : nil
+    }
+
+    private func chapterName(_ title: String) -> String {
+        // Sources can number chapters per volume or across the whole book.
+        // Keep the descriptive name, including any numbers within that name.
+        let prefix = #"^\s*第\s*[0-9０-９〇零一二两兩三四五六七八九十百千万萬壹贰貳叁參肆伍陆陸柒捌玖拾佰仟]+\s*[章回]\s*"#
+        return normalize(title.replacingOccurrences(of: prefix, with: "", options: .regularExpression))
     }
 
     private func normalize(_ value: String) -> String {
