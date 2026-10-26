@@ -33,6 +33,14 @@ final class OnlineSourceBrowserTests: XCTestCase {
         try await exerciseImport(target: #"target="_blank" rel="noopener noreferrer""#, failRaw: true)
     }
 
+    func testYueduSameWindowImportLinkUsesExistingPreviewFlow() async throws {
+        try await exerciseYueduImport(target: "")
+    }
+
+    func testYueduTargetBlankImportLinkUsesExistingPreviewFlow() async throws {
+        try await exerciseYueduImport(target: #"target="_blank" rel="noopener noreferrer""#)
+    }
+
     func testOrdinaryNewWindowLinkStaysInTheSameBrowser() async throws {
         let browser = OnlineSourceBrowser(url: OnlineBookSourcesView.catalogURL)
         var didImport = false
@@ -52,7 +60,14 @@ final class OnlineSourceBrowserTests: XCTestCase {
         XCTAssertNil(browser.errorMessage)
     }
 
-    private func exerciseImport(target: String, failRaw: Bool = false) async throws {
+    private func exerciseYueduImport(target: String) async throws {
+        let remoteURL = "https://cdn.mgz.la/shuyuan/250701%E6%9C%80%E5%90%8E%E4%B8%80%E7%89%88%E4%B8%80%E7%A8%8B.json"
+        try await exerciseImport(target: target, importLink: "yuedu://booksource/importonline?src=" + remoteURL,
+                                 expectedRemoteURL: remoteURL)
+    }
+
+    private func exerciseImport(target: String, importLink: String? = nil, expectedRemoteURL: String? = nil,
+                                failRaw: Bool = false) async throws {
         let transport = OnlineImportTransport(failRaw: failRaw)
         let library = SourceLibraryModel(repository: InMemoryBookSourceRepository(), importTransport: transport)
         let browser = OnlineSourceBrowser(url: OnlineBookSourcesView.catalogURL)
@@ -63,7 +78,7 @@ final class OnlineSourceBrowserTests: XCTestCase {
         }
         let window = host(browser.webView)
         defer { browser.webView.stopLoading(); window.isHidden = true }
-        try await load("<a id='import' href='\(importURL)' \(target)>点击此处导入</a>", in: browser.webView)
+        try await load("<a id='import' href='\(importLink ?? importURL)' \(target)>点击此处导入</a>", in: browser.webView)
         let originalURL = browser.webView.url
 
         _ = try await browser.webView.evaluateJavaScript("document.getElementById('import').click()")
@@ -78,7 +93,7 @@ final class OnlineSourceBrowserTests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(requests.count, failRaw ? 2 : 1)
         XCTAssertEqual(requests.first?.url?.absoluteString,
-                       "https://raw.githubusercontent.com/gedoor/gedoor.github.io/master/blog/2022-09-01-2213/%E6%BC%AB%E7%94%BB%E6%BA%90-haxc.txt")
+                       expectedRemoteURL ?? "https://raw.githubusercontent.com/gedoor/gedoor.github.io/master/blog/2022-09-01-2213/%E6%BC%AB%E7%94%BB%E6%BA%90-haxc.txt")
         if failRaw {
             XCTAssertEqual(requests.last?.url?.absoluteString,
                            "https://api.github.com/repos/gedoor/gedoor.github.io/contents/blog/2022-09-01-2213/%E6%BC%AB%E7%94%BB%E6%BA%90-haxc.txt?ref=master")

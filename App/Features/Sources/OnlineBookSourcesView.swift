@@ -4,34 +4,40 @@ import UIKit
 
 struct OnlineBookSourcesView: View {
     static let catalogURL = URL(string: "https://gedoor.github.io/blog/book-source-2022-9-2213")!
+    static let miaogongziURL = URL(string: "https://yuedu.miaogongzi.net/gx.html")!
 
     var body: some View {
         List {
             Section {
-                NavigationLink {
-                    OnlineSourceBrowserView(url: Self.catalogURL)
-                } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("开源阅读 · 九月书源更新")
-                            Text("gedoor.github.io · 2022 年 9 月")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 6)
-                    } icon: {
-                        Image(systemName: "globe")
-                            .foregroundStyle(ReadingTheme.accent)
-                    }
-                }
+                catalogLink("喵公子书源", subtitle: "书源合集与在线更新", url: Self.miaogongziURL)
+                catalogLink("开源阅读 · 九月书源更新", subtitle: "gedoor.github.io · 2022 年 9 月", url: Self.catalogURL)
             } footer: {
-                Text("在网页中点击「点击此处导入」，即可预览并选择书源。")
+                Text("在网页中点击「一键导入」或「点击此处导入」，即可预览并选择书源。")
             }
         }
         .listStyle(.insetGrouped)
         .readingScrollContentBackgroundHidden()
         .background(ReadingTheme.groupedCanvas)
         .navigationTitle("在线书源")
+    }
+
+    private func catalogLink(_ title: String, subtitle: String, url: URL) -> some View {
+        NavigationLink {
+            OnlineSourceBrowserView(url: url)
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            } icon: {
+                Image(systemName: "globe")
+                    .foregroundStyle(ReadingTheme.accent)
+            }
+        }
     }
 }
 
@@ -188,9 +194,8 @@ final class OnlineSourceBrowser: NSObject, ObservableObject, WKNavigationDelegat
     }
 
     private func routeImport(_ url: URL) -> Bool {
-        guard url.scheme?.lowercased() == "legado" else { return false }
-        guard url.host?.lowercased() == "import", url.path.lowercased() == "/booksource",
-              let onImport, !isImporting else { return true }
+        guard RuleImportInput.isDeepLink(url) else { return false }
+        guard let onImport, !isImporting else { return true }
         isImporting = true
         Task {
             await onImport(url)

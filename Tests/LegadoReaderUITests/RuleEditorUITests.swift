@@ -10,10 +10,17 @@ final class RuleEditorUITests: XCTestCase {
         app.buttons["更多"].firstMatch.tap()
         app.buttons["在线书源"].tap()
         XCTAssertTrue(app.navigationBars["在线书源"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["喵公子书源"].exists)
         app.staticTexts["开源阅读 · 九月书源更新"].tap()
         XCTAssertTrue(app.navigationBars["阅读书源分享"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
         attach(app, name: "Online source catalog in the internal browser")
+        app.navigationBars["阅读书源分享"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["在线书源"].waitForExistence(timeout: 10))
+        app.staticTexts["喵公子书源"].tap()
+        XCTAssertTrue(app.navigationBars["阅读书源分享"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
+        attach(app, name: "Miaogongzi catalog in the internal browser")
     }
 
     func testBookshelfTXTFilePickerImportsTXTAndDisablesJSON() throws {
