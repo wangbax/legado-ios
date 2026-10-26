@@ -15,6 +15,7 @@ final class SourceSwitchViewModel: ObservableObject {
     @Published private(set) var isPreviewLoading = false
     @Published private(set) var isSwitching = false
     @Published private(set) var errorMessage: String?
+    @Published var sourceQuery = ""
 
     private let book: Book
     private let service: BookSourceSwitchService
@@ -25,6 +26,13 @@ final class SourceSwitchViewModel: ObservableObject {
 
     var bookName: String { book.name }
     var currentChapterTitle: String? { book.durChapterTitle }
+    var filteredCandidates: [BookSourceCandidate] {
+        let query = sourceQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return candidates }
+        return candidates.filter {
+            $0.book.originName.localizedStandardContains(query) || $0.book.origin.localizedStandardContains(query)
+        }
+    }
     var canConfirm: Bool {
         preview != nil && !isPreviewLoading && !isSwitching && !hasConfirmedSelection
     }

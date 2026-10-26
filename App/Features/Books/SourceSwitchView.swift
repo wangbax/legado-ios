@@ -3,6 +3,7 @@ import SwiftUI
 struct SourceSwitchView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: SourceSwitchViewModel
+    @FocusState private var isSearchFocused: Bool
     let sources: [BookSource]
     let onSwitched: @MainActor (BookSourceSwitchReport, BookSource) -> Void
 
@@ -22,8 +23,9 @@ struct SourceSwitchView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 previewPanel
-                    .frame(height: model.selectedCandidate == nil ? 112 : min(max(geometry.size.height * 0.44, 200), 340))
+                    .frame(height: model.selectedCandidate == nil || isSearchFocused ? 112 : min(max(geometry.size.height * 0.44, 200), 340))
                 Divider()
+                sourceSearchField
                 candidatesContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 confirmationButton
@@ -42,6 +44,34 @@ struct SourceSwitchView: View {
         .task { await model.load(sources: sources) }
         .onDisappear { model.cancelSelection() }
         .interactiveDismissDisabled(model.isSwitching)
+    }
+
+    private var sourceSearchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("搜索书源名称或网址", text: $model.sourceQuery)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .submitLabel(.done)
+                .focused($isSearchFocused)
+                .onSubmit { isSearchFocused = false }
+                .accessibilityIdentifier("sourceSwitch.search")
+            if !model.sourceQuery.isEmpty {
+                Button {
+                    model.sourceQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("清除书源搜索")
+                .accessibilityIdentifier("sourceSwitch.search.clear")
+            }
+        }
+        .padding(10)
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        .disabled(model.isSwitching)
     }
 
     private var previewPanel: some View {
@@ -123,6 +153,13 @@ struct SourceSwitchView: View {
                 systemImage: "arrow.triangle.2.circlepath",
                 description: Text("仅显示书名一致的候选，并优先匹配作者。请确认其他书源已启用且支持搜索。")
             )
+        } else if model.filteredCandidates.isEmpty {
+            ReadingUnavailableView(
+                "没有匹配的书源",
+                systemImage: "magnifyingglass",
+                description: Text(model.state == .searching ? "可更换关键词；其他书源仍在查找中。" : "试试其他书源名称或网址，或清除搜索查看全部结果。")
+            )
+            .accessibilityIdentifier("sourceSwitch.search.empty")
         } else {
             List {
                 if model.state == .searching {
@@ -132,7 +169,7 @@ struct SourceSwitchView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                ForEach(model.candidates) { candidate in candidateRow(candidate) }
+                ForEach(model.filteredCandidates) { candidate in candidateRow(candidate) }
             }
             .listStyle(.insetGrouped)
             .readingScrollContentBackgroundHidden()
@@ -164,6 +201,7 @@ struct SourceSwitchView: View {
 
     private func candidateRow(_ candidate: BookSourceCandidate) -> some View {
         Button {
+            isSearchFocused = false
             Task { await model.select(candidate, sources: sources) }
         } label: {
             HStack(spacing: 13) {

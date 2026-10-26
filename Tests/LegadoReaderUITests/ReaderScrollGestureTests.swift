@@ -3,6 +3,38 @@ import UIKit
 
 @MainActor
 final class ReaderScrollGestureTests: XCTestCase {
+    func testSourceSearchFiltersCandidatesAndKeepsTheSelectedPreview() {
+        continueAfterFailure = false
+        let app = launchSourceSwitchPreview()
+        let first = app.buttons["sourceSwitch.candidate.https://science.example"]
+        let second = app.buttons["sourceSwitch.candidate.https://audio.example"]
+        let search = app.textFields["sourceSwitch.search"]
+        XCTAssertTrue(search.exists)
+        search.tap()
+        search.typeText("SCIENCE\n")
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertFalse(second.exists)
+        first.tap()
+        waitForSourcePreview("远方书库的本章正文", in: app)
+
+        search.tap()
+        app.buttons["sourceSwitch.search.clear"].tap()
+        search.typeText("no-such-source\n")
+        XCTAssertTrue(app.staticTexts["没有匹配的书源"].waitForExistence(timeout: 5))
+        XCTAssertFalse(first.exists)
+        XCTAssertFalse(second.exists)
+        waitForSourcePreview("远方书库的本章正文", in: app)
+        XCTAssertTrue(app.buttons["sourceSwitch.confirm"].isEnabled)
+        app.buttons["sourceSwitch.search.clear"].tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertTrue(second.exists)
+        attachScreenshot(app)
+        app.buttons["sourceSwitch.confirm"].tap()
+        let current = app.staticTexts["sourceSwitch.demo.current"]
+        XCTAssertTrue(current.waitForExistence(timeout: 5))
+        XCTAssertEqual(current.label, "当前书源：远方书库")
+    }
+
     func testSourceSwitchPreviewsCurrentChapterUntilExplicitConfirmation() {
         continueAfterFailure = false
         let app = launchSourceSwitchPreview()

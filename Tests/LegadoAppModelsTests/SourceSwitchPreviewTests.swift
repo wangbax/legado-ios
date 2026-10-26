@@ -5,6 +5,43 @@ import LegadoCore
 
 @MainActor
 struct SourceSwitchPreviewTests {
+    @Test func sourceSearchMatchesNamesAndURLsWithoutChangingCandidateOrder() {
+        let candidates = [
+            BookSourceCandidate(book: SearchBook(bookURL: "https://books.example/1", origin: "https://alpha.example", originName: "远方书库", type: 0, name: "书"), score: 190),
+            BookSourceCandidate(book: SearchBook(bookURL: "https://books.example/2", origin: "https://beta.example", originName: "远方听书", type: 1, name: "书"), score: 110)
+        ]
+        let model = SourceSwitchViewModel(book: Book(bookUrl: "old-book", name: "书"), candidates: candidates)
+        model.sourceQuery = " 远方\n"
+        #expect(model.filteredCandidates == candidates)
+        model.sourceQuery = "听书"
+        #expect(model.filteredCandidates == [candidates[1]])
+        model.sourceQuery = " ALPHA.EXAMPLE "
+        #expect(model.filteredCandidates == [candidates[0]])
+        model.sourceQuery = "books.example"
+        #expect(model.filteredCandidates.isEmpty)
+        model.sourceQuery = " \n\t"
+        #expect(model.filteredCandidates == candidates)
+        #expect(model.candidates == candidates)
+    }
+
+    @Test func filteringAndClearingSearchPreservesTheSelectedChapterPreview() async throws {
+        let f = SourcePreviewFixture()
+        await f.model.select(f.candidates[0], sources: f.sources)
+        f.model.sourceQuery = "b"
+        #expect(f.model.filteredCandidates == [f.candidates[1]])
+        #expect(f.model.selectedCandidate == f.candidates[0])
+        #expect(f.model.preview?.report.verifiedContent?.content == "甲源本章正文")
+        #expect(f.model.canConfirm)
+        f.model.sourceQuery = "not-found"
+        #expect(f.model.filteredCandidates.isEmpty)
+        f.model.sourceQuery = ""
+        #expect(f.model.filteredCandidates == f.candidates)
+        let confirmed = try #require(await f.model.confirmSelection())
+        #expect(confirmed.source.id == "a")
+        #expect(await f.loader.requestCount("a") == 1)
+        #expect(await f.loader.requestCount("b") == 0)
+    }
+
     @Test func previewPreservesTheCurrentDirectoryUntilConfirmationAndReusesItsBody() async throws {
         let f = SourcePreviewFixture(sharedBookURL: true)
         await f.model.select(f.candidates[0], sources: f.sources)
