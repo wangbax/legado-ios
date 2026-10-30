@@ -115,6 +115,11 @@ final class SourceLibraryModel: ObservableObject {
         }
     }
 
+    func reloadAfterLibraryImport() async {
+        sources = []
+        await load()
+    }
+
     func importFiles(_ urls: [URL]) async {
         isWorking = true
         defer { isWorking = false }

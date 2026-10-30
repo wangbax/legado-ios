@@ -3,12 +3,14 @@ import SwiftUI
 import UIKit
 
 struct OnlineBookSourcesView: View {
+    static let yuqueURL = URL(string: "https://www.yuque.com/legado/pd/rp3gdumplxqc3oo2")!
     static let catalogURL = URL(string: "https://gedoor.github.io/blog/book-source-2022-9-2213")!
     static let miaogongziURL = URL(string: "https://yuedu.miaogongzi.net/gx.html")!
 
     var body: some View {
         List {
             Section {
+                catalogLink("⭐ 开源阅读 · 书源站", subtitle: "语雀 · 书源与字体资源", url: Self.yuqueURL)
                 catalogLink("喵公子书源", subtitle: "书源合集与在线更新", url: Self.miaogongziURL)
                 catalogLink("开源阅读 · 九月书源更新", subtitle: "gedoor.github.io · 2022 年 9 月", url: Self.catalogURL)
             } footer: {

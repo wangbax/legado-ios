@@ -2,12 +2,14 @@
 
 ## 环境
 
-- macOS；支持 Swift 6 的 Xcode，当前开发环境为 Xcode 26.1。
+- macOS；Xcode 27 或更新版本（Google Sign-In 10.x 的构建要求），当前开发环境为 Xcode 27.1。
 - App 最低 iOS 15.0；核心包也可在 macOS 14+ 测试。
 - Swift Package Manager 依赖由 `Package.resolved` 锁定，初次解析需要网络。
 - 运行脚本需 Python 3 和 `rg`（ripgrep）。
 
 在独立仓库根目录打开 `Legado.xcodeproj`，选择 `Legado` Scheme。真机运行需要自行设置签名团队；请勿将证书或描述文件提交到仓库。
+
+备份、WebDAV、Google Drive 配置与可选 iCloud 签名见 [备份与同步](BACKUP_SYNC.md)。
 
 ## 代码结构
 

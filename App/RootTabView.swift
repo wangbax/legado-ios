@@ -143,6 +143,7 @@ struct RootTabView: View {
 }
 
 private struct SourceSwitchDemoView: View {
+    @State private var sourceSwitchCache = SourceSwitchCache()
     @State private var book = DemoContent.sourceSwitchBook
     @State private var showsSourceSwitch = true
 
@@ -156,7 +157,9 @@ private struct SourceSwitchDemoView: View {
             ReadingNavigationStack {
                 SourceSwitchView(book: book, sources: DemoContent.sources,
                                  demoCandidates: DemoContent.sourceSwitchCandidates,
-                                 service: DemoContent.sourceSwitchService) { report, _ in
+                                 service: DemoContent.sourceSwitchService,
+                                 referenceService: DemoContent.sourceSwitchReferenceService,
+                                 cache: sourceSwitchCache) { report, _ in
                     book = report.book
                 }
             }
@@ -1287,8 +1290,14 @@ private struct SettingsView: View {
                         readingSection
                         rulesSection
                         settingSection("文件与存储") {
-                            settingLink("文件管理", icon: "folder", showsSeparator: false) {
+                            settingLink("备份与同步", icon: "icloud") {
+                                BackupSyncView()
+                            }
+                            settingLink("文件管理", icon: "folder") {
                                 FileManagementView()
+                            }
+                            settingLink("缓存管理", icon: "internaldrive", showsSeparator: false) {
+                                CacheManagementView()
                             }
                         }
                         supportSection

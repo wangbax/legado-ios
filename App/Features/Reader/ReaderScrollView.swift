@@ -278,18 +278,27 @@ struct ReaderScrollView: UIViewRepresentable {
             guard let view, !blocks.isEmpty else { return nil }
             let layout = view.collectionViewLayout as! ReaderContinuousLayout
             let y = max(view.contentOffset.y, layout.frames.first?.minY ?? 0)
-            guard let row = layout.row(at: y) else { return nil }
+            // UIKit snaps content offsets to physical pixels; TextKit's chapter
+            // boundaries can fall between them. A subpixel remainder belongs
+            // to the heading now visible, rather than the preceding chapter.
+            let scale = view.window?.screen.scale ?? view.traitCollection.displayScale
+            let pixel = 1 / max(scale, 1)
+            guard let row = layout.row(at: y + pixel) else { return nil }
             let block = blocks[row], chapter = block.chapter
-            let localY = y - layout.frames[row].minY + block.top
+            let localY = max(y - layout.frames[row].minY, 0) + block.top
             let glyph = chapter.manager.glyphIndex(for: CGPoint(x: 0, y: localY + 0.5), in: chapter.container)
             let safeGlyph = min(glyph, max(chapter.manager.numberOfGlyphs - 1, 0))
             let character = chapter.manager.characterIndexForGlyph(at: safeGlyph)
             let lineY = chapter.manager.lineFragmentRect(forGlyphAt: safeGlyph, effectiveRange: nil).minY
+            // Do not carry the rounding remainder into each subsequent prepend;
+            // many short chapters would otherwise accumulate a visible offset.
+            let anchorOffset = abs(y - layout.frames[row].minY) <= pixel
+                ? layout.frames[row].minY : view.contentOffset.y
             return Anchor(
                 chapter: chapter.chapter.id,
                 position: min(max(character - chapter.bodyStart, 0), chapter.chapter.content.utf16.count),
                 inHeading: character < chapter.bodyStart,
-                screenY: layout.frames[row].minY + lineY - block.top - view.contentOffset.y
+                screenY: layout.frames[row].minY + lineY - block.top - anchorOffset
             )
         }
 
@@ -329,7 +338,11 @@ struct ReaderScrollView: UIViewRepresentable {
             let index = row * 3 + column
             let actions = parent.configuration.clickActions
             let action = index == 4 ? 0 : (actions.indices.contains(index) ? actions[index] : 0)
-            if action != 1, action != 2, action != -1 { parent.configuration.onTapAction(action) }
+            if action == 1 || action == 2 {
+                parent.configuration.onTapAction(0)
+            } else if action != -1 {
+                parent.configuration.onTapAction(action)
+            }
         }
 
         @objc private func step(_ link: CADisplayLink) {

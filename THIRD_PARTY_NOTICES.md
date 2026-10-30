@@ -21,6 +21,13 @@
 - 用途：XPath 解析。
 - 许可：MIT，完整版权及许可见 [Kanna-LICENSE.txt](App/Resources/Kanna-LICENSE.txt)。
 
+## Google Sign-In 及依赖
+
+- 项目：<https://github.com/google/GoogleSignIn-iOS>。
+- 用途：Google 账号登录授权及 Google Drive 应用专用空间备份。
+- 许可：Apache License 2.0。Google Sign-In、AppAuth、GTMAppAuth、GTM Session Fetcher、App Check、GoogleUtilities 和相关互操作依赖的版权及许可见 [GoogleSignIn-LICENSES.txt](App/Resources/GoogleSignIn-LICENSES.txt)。
+- 依赖版本由 [Package.resolved](Legado.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved) 锁定，应用内「开源许可」也提供对应文本。
+
 ## 测试数据与演示内容
 
 测试中的规则样本仅用于兼容验证，不打包为 App 默认书源。具体说明见 [测试样本说明](Tests/LegadoCoreTests/Fixtures/README.md)。演示模式使用虚构书籍元数据和项目内演示文本；发布截图不使用个人书架、登录信息或付费章节。

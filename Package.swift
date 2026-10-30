@@ -46,7 +46,7 @@ let package = Package(
             ],
             sources: [
                 "Sources/SourceLibraryModel.swift", "Rules/ReplaceRuleLibraryModel.swift", "Search/SearchViewModel.swift",
-                "Books/BookLibraryModel.swift", "Books/BookDetailViewModel.swift", "Books/SourceSwitchViewModel.swift",
+                "Books/BookLibraryModel.swift", "Books/BookDetailViewModel.swift", "Books/SourceSwitchViewModel.swift", "Books/SourceChapterVerification.swift", "Books/SourceSwitchCache.swift",
                 "Books/BookshelfReadViewModel.swift", "Reader/ReaderViewModel.swift"
             ]
         ),

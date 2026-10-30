@@ -1,5 +1,17 @@
 import Foundation
 
+#if DEBUG
+struct ReaderCacheTestLoader: ChapterContentLoading {
+    func loadContent(book: Book, chapter: BookChapter, source: BookSource, nextChapterURL: String?, maxPages: Int) async -> ChapterContentReport {
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        if chapter.index.isMultiple(of: 11) {
+            return .init(diagnostics: [.init(severity: .error, code: "cache.fixture", message: "缓存测试：模拟 HTTP 403", rule: chapter.url)])
+        }
+        return .init(title: chapter.title, content: DemoContent.readerText)
+    }
+}
+#endif
+
 enum DemoContent {
     static let sources: [BookSource] = {
         var classic = BookSource(bookSourceUrl: "https://classic.example", bookSourceName: "经典文学馆")
@@ -116,13 +128,27 @@ enum DemoContent {
     }
 
     static var sourceSwitchService: BookSourceSwitchService {
-        let loader = DemoSourceSwitchLoader(body: readerText)
+        let loader = DemoSourceSwitchLoader(body: readerText,
+            sameText: ProcessInfo.processInfo.arguments.contains("-uiDemoSourceGroups"))
         return BookSourceSwitchService(detailLoader: loader, chapterLoader: loader, contentLoader: loader,
                                        chapterRepository: InMemoryBookChapterRepository())
     }
 
+    static var sourceSwitchReferenceService: any SourceChapterReferencing {
+        DemoSourceReference(value: ProcessInfo.processInfo.arguments.contains("-uiDemoSourceReference")
+            ? SourceChapterReference(provider: "QQ 阅读（演示）", chapterTitle: readerChapters[1].title,
+                                     url: "https://book.qq.com/book-read/1/2", content: String(readerText.prefix(240)))
+            : nil)
+    }
+
+    private struct DemoSourceReference: SourceChapterReferencing {
+        let value: SourceChapterReference?
+        func reference(for book: Book) async -> SourceChapterReference? { value }
+    }
+
     private struct DemoSourceSwitchLoader: BookDetailLoading, ChapterListLoading, ChapterContentLoading {
         let body: String
+        var sameText = false
 
         func loadDetail(searchBook: SearchBook, source: BookSource) async -> BookDetailReport {
             var book = Book(bookUrl: searchBook.bookURL, name: searchBook.name, author: searchBook.author, origin: source.id)
@@ -131,7 +157,7 @@ enum DemoContent {
         }
 
         func loadChapters(book: Book, source: BookSource, maxPages: Int) async -> ChapterListReport {
-            let titles = ["第一章 · 雨夜", source.bookSourceType == 1 ? "第二节 灯塔" : "第二章 · 灯塔",
+            let titles = ["第一章 · 雨夜", source.bookSourceType == 1 && !sameText ? "第二节 灯塔" : "第二章 · 灯塔",
                           "第三章 · 潮声", "第四章 · 来信", "第五章 · 天明"]
             return .init(chapters: titles.enumerated().map {
                 BookChapter(url: book.bookUrl + "/\($0.offset)", title: $0.element, bookUrl: book.bookUrl, index: $0.offset)
@@ -139,7 +165,7 @@ enum DemoContent {
         }
 
         func loadContent(book: Book, chapter: BookChapter, source: BookSource, nextChapterURL: String?, maxPages: Int) async -> ChapterContentReport {
-            .init(content: source.bookSourceName + "的本章正文。\n\n" + body)
+            .init(content: sameText ? body : source.bookSourceName + "的本章正文。\n\n" + body)
         }
     }
 

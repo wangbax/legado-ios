@@ -6,7 +6,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CB5000000000000000000004 /* AutomaticLibraryBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4000000000000000000004; };
+		CB1000000000000000000001 /* LibrarySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000001; };
+		CB1000000000000000000002 /* LibraryBackupArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000002; };
+		CB1000000000000000000003 /* LibrarySyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000003; };
+		CB1000000000000000000004 /* ICloudLibraryTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000004; };
+		CB1000000000000000000005 /* BackupSyncModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000005; };
+		CB1000000000000000000006 /* BackupSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB2000000000000000000006; };
 		CA1000000000000000000004 /* SourceSwitchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000004; };
+		CA1000000000000000000005 /* SourceChapterVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000005; };
+		CA1000000000000000000006 /* SourceSwitchCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000006; };
 		CA1000000000000000000001 /* OnlineBookSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000001; };
 		CA1000000000000000000002 /* OnlineSourceBrowserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000002; };
 		CA1000000000000000000003 /* RuleImportDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2000000000000000000003; };
@@ -127,10 +136,24 @@
 		AA1100000000000000000008 = {isa = PBXBuildFile; fileRef = AA2200000000000000000008; };
 		AA1100000000000000000009 = {isa = PBXBuildFile; fileRef = AA2200000000000000000009; };
 		AA1100000000000000000010 = {isa = PBXBuildFile; fileRef = AA2200000000000000000010; };
+		CB5000000000000000000001 /* RemoteLibraryBackups.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4000000000000000000001; };
+		CB5000000000000000000002 /* GoogleDriveBackupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4000000000000000000002; };
+		CB5000000000000000000003 /* CloudBackupAccounts.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4000000000000000000003; };
+		CB6000000000000000000001 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = CB6000000000000000000002; };
+		CB7000000000000000000001 /* GoogleSignIn-LICENSES.txt in Resources */ = {isa = PBXBuildFile; fileRef = CB7000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CB4000000000000000000004 /* AutomaticLibraryBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/AutomaticLibraryBackup.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000001 /* LibrarySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/LibrarySnapshot.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000002 /* LibraryBackupArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/LibraryBackupArchive.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000003 /* LibrarySyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/LibrarySyncCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000004 /* ICloudLibraryTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Features/Settings/ICloudLibraryTransport.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000005 /* BackupSyncModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Features/Settings/BackupSyncModel.swift; sourceTree = SOURCE_ROOT; };
+		CB2000000000000000000006 /* BackupSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Features/Settings/BackupSyncView.swift; sourceTree = SOURCE_ROOT; };
 		CA2000000000000000000004 /* SourceSwitchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSwitchViewModel.swift; sourceTree = "<group>"; };
+		CA2000000000000000000005 /* SourceChapterVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceChapterVerification.swift; sourceTree = "<group>"; };
+		CA2000000000000000000006 /* SourceSwitchCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSwitchCache.swift; sourceTree = "<group>"; };
 		CA2000000000000000000001 /* OnlineBookSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineBookSourcesView.swift; sourceTree = "<group>"; };
 		CA2000000000000000000002 /* OnlineSourceBrowserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderTests/OnlineSourceBrowserTests.swift; sourceTree = SOURCE_ROOT; };
 		CA2000000000000000000003 /* RuleImportDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleImportDownloader.swift; sourceTree = "<group>"; };
@@ -253,6 +276,10 @@
 		AA2200000000000000000008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Import/QRCodeDecoder.swift; sourceTree = SOURCE_ROOT; };
 		AA2200000000000000000009 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderUITests/RuleEditorUITests.swift; sourceTree = SOURCE_ROOT; };
 		AA2200000000000000000010 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/LegadoReaderUITests/LiveReadingFlowUITests.swift; sourceTree = SOURCE_ROOT; };
+		CB4000000000000000000001 /* RemoteLibraryBackups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/RemoteLibraryBackups.swift; sourceTree = SOURCE_ROOT; };
+		CB4000000000000000000002 /* GoogleDriveBackupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/LegadoCore/Persistence/GoogleDriveBackupStore.swift; sourceTree = SOURCE_ROOT; };
+		CB4000000000000000000003 /* CloudBackupAccounts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Features/Settings/CloudBackupAccounts.swift; sourceTree = SOURCE_ROOT; };
+		CB7000000000000000000002 /* GoogleSignIn-LICENSES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = GoogleSignIn-LICENSES.txt; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -264,15 +291,29 @@
 			files = (
 				F10000000000000000000001 /* SwiftSoup in Frameworks */,
 				F10000000000000000000002 /* Kanna in Frameworks */,
+                CB6000000000000000000001 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		CB3000000000000000000001 /* Backup and Sync */ = {isa = PBXGroup; children = (
+				CB4000000000000000000001 /* RemoteLibraryBackups.swift */,
+                CB4000000000000000000002 /* GoogleDriveBackupStore.swift */,
+                CB4000000000000000000004 /* AutomaticLibraryBackup.swift */,
+                CB4000000000000000000003 /* CloudBackupAccounts.swift */,
+                CB2000000000000000000001 /* LibrarySnapshot.swift */,
+				CB2000000000000000000002 /* LibraryBackupArchive.swift */,
+				CB2000000000000000000003 /* LibrarySyncCoordinator.swift */,
+				CB2000000000000000000004 /* ICloudLibraryTransport.swift */,
+				CB2000000000000000000005 /* BackupSyncModel.swift */,
+				CB2000000000000000000006 /* BackupSyncView.swift */,
+			); name = "Backup and Sync"; sourceTree = "<group>"; };
 		D40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				CB3000000000000000000001 /* Backup and Sync */,
 				CA2000000000000000000002 /* OnlineSourceBrowserTests.swift */,
 				AA2200000000000000000001 /* SourceEditorView.swift */,
 				AA2200000000000000000002 /* ReplaceRuleEditorView.swift */,
@@ -349,6 +390,8 @@
 				A20000000000000000000008 /* BookDetailView.swift */,
 				A20000000000000000000015 /* SourceSwitchView.swift */,
 				CA2000000000000000000004 /* SourceSwitchViewModel.swift */,
+				CA2000000000000000000005 /* SourceChapterVerification.swift */,
+				CA2000000000000000000006 /* SourceSwitchCache.swift */,
 				A2000000000000000000000F /* LocalBookDetailView.swift */,
 			);
 			path = Features/Books;
@@ -601,6 +644,7 @@
 				E20000000000000000000008 /* Legado-LICENSE.txt */,
 				E20000000000000000000009 /* SwiftSoup-LICENSE.txt */,
 				E2000000000000000000000A /* Kanna-LICENSE.txt */,
+                CB7000000000000000000002 /* GoogleSignIn-LICENSES.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -634,6 +678,7 @@
 			packageProductDependencies = (
 				F20000000000000000000001 /* SwiftSoup */,
 				F20000000000000000000002 /* Kanna */,
+                CB6000000000000000000002 /* GoogleSignIn */,
 			);
 			productName = Legado;
 			productReference = D20000000000000000000001 /* Legado.app */;
@@ -659,7 +704,7 @@
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
                     B50000000000000000000050 = {CreatedOnToolsVersion = 26.1; TestTargetID = D50000000000000000000001; };
-					D50000000000000000000001 = { CreatedOnToolsVersion = 26.1; };
+					D50000000000000000000001 = { CreatedOnToolsVersion = 26.1;  };
 				};
 			};
 			buildConfigurationList = D60000000000000000000001 /* Build configuration list for PBXProject "Legado" */;
@@ -671,6 +716,7 @@
 			packageReferences = (
 				F30000000000000000000001 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 				F30000000000000000000002 /* XCRemoteSwiftPackageReference "Kanna" */,
+                CB6000000000000000000003 /* GoogleSignIn-iOS */,
 			);
 			productRefGroup = D40000000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -685,6 +731,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				91000000000000000000000A /* Kanna-LICENSE.txt in Resources */,
+                CB7000000000000000000001 /* GoogleSignIn-LICENSES.txt in Resources */,
 				910000000000000000000009 /* SwiftSoup-LICENSE.txt in Resources */,
 				910000000000000000000008 /* Legado-LICENSE.txt in Resources */,
 				A10000000000000000000020 /* Assets.xcassets in Resources */,
@@ -716,6 +763,16 @@
 				910000000000000000000003 /* DiagnosticLog.swift in Sources */,
 				910000000000000000000002 /* HostsHTTPTransport.swift in Sources */,
 				910000000000000000000001 /* ApplicationSettings.swift in Sources */,
+				CB5000000000000000000001 /* RemoteLibraryBackups.swift in Sources */,
+                CB5000000000000000000002 /* GoogleDriveBackupStore.swift in Sources */,
+                CB5000000000000000000004 /* AutomaticLibraryBackup.swift in Sources */,
+                CB5000000000000000000003 /* CloudBackupAccounts.swift in Sources */,
+                CB1000000000000000000001 /* LibrarySnapshot.swift in Sources */,
+				CB1000000000000000000002 /* LibraryBackupArchive.swift in Sources */,
+				CB1000000000000000000003 /* LibrarySyncCoordinator.swift in Sources */,
+				CB1000000000000000000004 /* ICloudLibraryTransport.swift in Sources */,
+				CB1000000000000000000005 /* BackupSyncModel.swift in Sources */,
+				CB1000000000000000000006 /* BackupSyncView.swift in Sources */,
 				A10000000000000000000001 /* LegadoApp.swift in Sources */,
 				A10000000000000000000002 /* RootTabView.swift in Sources */,
 				A10000000000000000000003 /* SourceLibraryModel.swift in Sources */,
@@ -752,6 +809,8 @@
 				A10000000000000000000013 /* CacheManagementView.swift in Sources */,
 				A10000000000000000000014 /* SourceSwitchView.swift in Sources */,
 				CA1000000000000000000004 /* SourceSwitchViewModel.swift in Sources */,
+				CA1000000000000000000005 /* SourceChapterVerification.swift in Sources */,
+				CA1000000000000000000006 /* SourceSwitchCache.swift in Sources */,
 				A10000000000000000000015 /* RSSLibraryModel.swift in Sources */,
 				A10000000000000000000016 /* RSSViews.swift in Sources */,
 				A10000000000000000000017 /* RSSSourceEditorView.swift in Sources */,
@@ -883,6 +942,12 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = "$(LEGADO_ENTITLEMENTS_FILE)";
+                LEGADO_ENTITLEMENTS_FILE = App/Legado.entitlements;
+                LEGADO_ICLOUD_ENABLED = NO;
+                GOOGLE_CLIENT_ID = "497483620209-fqhg16gf0o1j83e7f7ek2s5ed5145jva.apps.googleusercontent.com";
+                GOOGLE_CLIENT_BUNDLE_ID = "com.wangbax.legado.xd";
+                GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.497483620209-fqhg16gf0o1j83e7f7ek2s5ed5145jva";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.11;
 				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
@@ -903,6 +968,12 @@
 				CURRENT_PROJECT_VERSION = 17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = "$(LEGADO_ENTITLEMENTS_FILE)";
+                LEGADO_ENTITLEMENTS_FILE = App/Legado.entitlements;
+                LEGADO_ICLOUD_ENABLED = NO;
+                GOOGLE_CLIENT_ID = "497483620209-fqhg16gf0o1j83e7f7ek2s5ed5145jva.apps.googleusercontent.com";
+                GOOGLE_CLIENT_BUNDLE_ID = "com.wangbax.legado.xd";
+                GOOGLE_REVERSED_CLIENT_ID = "com.googleusercontent.apps.497483620209-fqhg16gf0o1j83e7f7ek2s5ed5145jva";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.11;
 				OTHER_LDFLAGS = "$(inherited) -lsqlite3";
@@ -945,6 +1016,7 @@
 			repositoryURL = "https://github.com/tid-kijyun/Kanna.git";
 			requirement = { kind = exactVersion; version = 6.1.0; };
 		};
+		CB6000000000000000000003 /* GoogleSignIn-iOS */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git"; requirement = {kind = exactVersion; version = 10.1.0; }; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -958,6 +1030,7 @@
 			package = F30000000000000000000002 /* XCRemoteSwiftPackageReference "Kanna" */;
 			productName = Kanna;
 		};
+		CB6000000000000000000002 /* GoogleSignIn */ = {isa = XCSwiftPackageProductDependency; package = CB6000000000000000000003; productName = GoogleSignIn; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D70000000000000000000001 /* Project object */;

@@ -286,6 +286,27 @@ struct BookSourceSwitchServiceTests {
         }
     }
 
+    @Test func automaticChapterInspectionDoesNotFetchOrSaveAnApproximateChapter() async throws {
+        var current = Book(bookUrl: "old", name: "书", origin: "old")
+        current.durChapterTitle = "第212章 你的名字"
+        let chapters = [BookChapter(url: "wrong", title: "第212章 别的故事", bookUrl: "new", index: 0)]
+        let loader = StubSwitchLoader(chapters: chapters)
+        let content = RecordingSwitchContentLoader()
+        let repository = InMemoryBookChapterRepository()
+        let service = BookSourceSwitchService(detailLoader: loader, chapterLoader: loader,
+                                              contentLoader: content, chapterRepository: repository)
+
+        let report = try #require(await service.prepareSwitch(current: current,
+            candidate: SearchBook(bookURL: "new", origin: "new", originName: "新源", type: 0, name: "书"),
+            source: BookSource(bookSourceUrl: "new", bookSourceName: "新源"),
+            persistChapters: false, requireExactChapterMatch: true))
+
+        #expect(!report.exactChapterMatch)
+        #expect(report.verifiedContent == nil)
+        #expect(await content.chapterURL == nil)
+        #expect(await repository.load(bookURL: "new").isEmpty)
+    }
+
     @Test func automaticRecoverySkipsSearchableSourcesWithDirectoriesButBrokenBodies() async throws {
         let candidates = ["broken-body", "valid"].map {
             SearchBook(bookURL: $0 + "-book", origin: $0, originName: $0, type: 0, name: "书")
