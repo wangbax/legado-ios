@@ -84,7 +84,8 @@ public extension JSONValue {
         if value is NSNull { return .null }
         if let value = value as? JSONValue { return value }
         if let value = value as? String { return .string(value) }
-        if let value = value as? Bool { return .bool(value) }
+        // NSNumber(0/1) also casts to Bool. Inspect its CF type first so
+        // JavaScript page arithmetic and numeric IDs remain numbers.
         if let value = value as? NSNumber {
             if CFGetTypeID(value) == CFBooleanGetTypeID() { return .bool(value.boolValue) }
             return .number(value.doubleValue)

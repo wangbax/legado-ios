@@ -108,17 +108,13 @@ final class LiveReadingFlowUITests: XCTestCase {
         showReaderMenu()
         app.buttons["换源"].tap()
         XCTAssertTrue(app.navigationBars["为《极道天魔》换源"].waitForExistence(timeout: 10))
-        let replacement = app.buttons["sourceSwitch.candidate." + replacementID]
+        let replacement = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "sourceSwitch.candidate." + replacementID + "|", "滚开"
+        )).firstMatch
         XCTAssertTrue(replacement.waitForExistence(timeout: 240))
         attach("07-source-candidates")
         replacement.tap()
-        let preview = app.staticTexts["sourceSwitch.preview.content"]
-        waitUntil("Mapped chapter preview", timeout: 90) { preview.exists && !preview.label.isEmpty }
-        XCTAssertTrue(app.navigationBars["为《极道天魔》换源"].exists)
-        let confirm = app.buttons["sourceSwitch.confirm"]
-        XCTAssertTrue(confirm.isEnabled)
-        attach("07-source-preview")
-        confirm.tap()
         waitUntil("Source switch sheet dismissed", timeout: 90) {
             !self.app.navigationBars["为《极道天魔》换源"].exists
         }

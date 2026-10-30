@@ -23,34 +23,100 @@ final class RuleEditorUITests: XCTestCase {
         attach(app, name: "Miaogongzi catalog in the internal browser")
     }
 
-    func testBookshelfTXTFilePickerImportsTXTAndDisablesJSON() throws {
-        try exerciseLocalTXTImport(fromFileManagement: false)
-    }
 
-    func testFileManagementTXTFilePickerImportsTXTAndDisablesJSON() throws {
-        try exerciseLocalTXTImport(fromFileManagement: true)
-    }
-
-    private func exerciseLocalTXTImport(fromFileManagement: Bool) throws {
+    func testRSSSearchSubmissionPaginationAndFavorites() throws {
+        guard let fixture = ProcessInfo.processInfo.environment["LEGADO_RSS_UI_FIXTURE_URL"] else {
+            throw XCTSkip("Set LEGADO_RSS_UI_FIXTURE_URL to the local RSS fixture source URL")
+        }
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiDemo", "-themeMode", "1", "-bookshelfLayout", "grid3"]
+        app.launchArguments = ["-uiDemo", "-uiDemoTab", "rss", "-themeMode", "1"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["RSS"].waitForExistence(timeout: 20))
+        // Replace an existing source in this launch, so a cached navigation
+        // destination cannot silently keep using the previous content rules.
+        for url in [fixture + "?legacy=1", fixture] {
+            app.buttons["RSS操作"].tap()
+            app.buttons["URL或粘贴JSON"].tap()
+            let editor = app.textViews.firstMatch
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            editor.tap()
+            editor.typeText(url)
+            app.navigationBars["导入RSS源"].buttons["导入"].tap()
+            let dismissed = expectation(for: NSPredicate { _, _ in !app.navigationBars["导入RSS源"].exists }, evaluatedWith: nil)
+            wait(for: [dismissed], timeout: 10)
+        }
+        let source = app.staticTexts["RSS 全流程测试"]
+        XCTAssertTrue(source.waitForExistence(timeout: 10))
+        source.tap()
+        XCTAssertTrue(app.staticTexts["首页文章"].waitForExistence(timeout: 10))
+        let search = app.searchFields["源内搜索"]
+        if !search.exists { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("needle\n")
+        let result = app.staticTexts["搜索结果 needle 第1页"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10))
+        let nextPage = app.buttons["加载下一页"]
+        let ready = expectation(for: NSPredicate { _, _ in nextPage.exists && nextPage.isEnabled }, evaluatedWith: nil)
+        wait(for: [ready], timeout: 10)
+        nextPage.tap()
+        XCTAssertTrue(app.staticTexts["搜索结果 needle 第2页"].waitForExistence(timeout: 10))
+        result.tap()
+        XCTAssertTrue(app.navigationBars["文章"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.webViews.staticTexts["第1次加载的订阅正文"].waitForExistence(timeout: 10))
+        app.buttons["阅读操作"].tap()
+        app.buttons["刷新"].tap()
+        XCTAssertTrue(app.webViews.staticTexts["第2次加载的订阅正文"].waitForExistence(timeout: 10))
+        if app.buttons["取消收藏"].exists { app.buttons["取消收藏"].tap() }
+        XCTAssertTrue(app.buttons["收藏"].waitForExistence(timeout: 5))
+        app.buttons["收藏"].tap()
+        XCTAssertTrue(app.buttons["取消收藏"].waitForExistence(timeout: 5))
+        app.navigationBars["文章"].buttons.element(boundBy: 0).tap()
+        let cancelSearch = app.navigationBars["RSS 全流程测试"].buttons.matching(NSPredicate(
+            format: "label IN %@", ["Cancel", "取消", "Close", "关闭"]
+        )).firstMatch
+        if cancelSearch.exists { cancelSearch.tap() }
+        app.navigationBars["RSS 全流程测试"].buttons["RSS"].tap()
+        XCTAssertTrue(app.navigationBars["RSS"].waitForExistence(timeout: 5))
+        app.segmentedControls.buttons["收藏"].tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        attach(app, name: "RSS search article saved to favorites")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["RSS 全流程测试"].waitForExistence(timeout: 10))
+        app.segmentedControls.buttons["收藏"].tap()
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+    }
+
+    func testBookshelfFilePickerImportsTXTAndEPUBAndDisablesJSON() throws {
+        try exerciseLocalBookImport(fromFileManagement: false)
+    }
+
+    func testFileManagementFilePickerImportsTXTAndEPUBAndDisablesJSON() throws {
+        try exerciseLocalBookImport(fromFileManagement: true)
+    }
+
+    private func exerciseLocalBookImport(fromFileManagement: Bool) throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiDemo", "-themeMode", "1", "-bookshelfLayout", "grid3", "-pageAnim", "0"]
         if fromFileManagement { app.launchArguments += ["-uiDemoTab", "settings", "-uiDemoFiles"] }
         app.launch()
-        let importTitle = fromFileManagement ? "导入 TXT 文件" : "本地书"
+        let importTitle = fromFileManagement ? "导入 TXT / EPUB" : "本地书"
         let more = fromFileManagement
             ? app.navigationBars["文件管理"].buttons["更多"].firstMatch
             : app.buttons["更多"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 20))
         more.tap()
-        app.buttons[importTitle].tap()
+        app.buttons[importTitle].firstMatch.tap()
         let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "取消"])).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 10))
         cancel.tap()
         let closed = expectation(for: NSPredicate { _, _ in !cancel.exists }, evaluatedWith: nil)
         wait(for: [closed], timeout: 10)
         more.tap()
-        app.buttons[importTitle].tap()
+        app.buttons[importTitle].firstMatch.tap()
         XCTAssertTrue(cancel.waitForExistence(timeout: 10))
 
         let pickerFiles = app.collectionViews["File View"].cells
@@ -83,10 +149,14 @@ final class RuleEditorUITests: XCTestCase {
             json.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             XCTAssertFalse(open.exists && open.isEnabled, "JSON must not be selectable as a local book")
         }
-        txt.tap()
+        txt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
         let uppercase = pickerFiles.matching(NSPredicate(format: "label BEGINSWITH %@", "TXT-Uppercase")).firstMatch
         XCTAssertTrue(uppercase.waitForExistence(timeout: 5))
-        uppercase.tap()
+        uppercase.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
+        let epub = pickerFiles.matching(NSPredicate(format: "label BEGINSWITH %@", "EPUB-Book")).firstMatch
+        XCTAssertTrue(epub.waitForExistence(timeout: 5))
+        XCTAssertTrue(epub.isEnabled)
+        epub.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
         XCTAssertTrue(open.waitForExistence(timeout: 5))
         XCTAssertTrue(open.isEnabled)
         attach(app, name: "TXT selectable and JSON excluded")
@@ -94,19 +164,33 @@ final class RuleEditorUITests: XCTestCase {
 
         if fromFileManagement {
             XCTAssertTrue(app.navigationBars["文件管理"].waitForExistence(timeout: 15))
+            XCTAssertFalse(app.alerts["文件操作失败"].waitForExistence(timeout: 3), app.debugDescription)
             app.tabBars.buttons["书架"].tap()
         } else {
             XCTAssertTrue(app.navigationBars["导入本地书"].waitForExistence(timeout: 15))
             XCTAssertFalse(app.staticTexts["JSON-Source.json"].exists)
             XCTAssertFalse(app.staticTexts["JSON-Uppercase.JSON"].exists)
-            XCTAssertTrue(app.staticTexts["TXT-Book.txt"].exists)
-            XCTAssertTrue(app.staticTexts["TXT-Uppercase.TXT"].exists)
+            XCTAssertTrue(app.staticTexts["TXT-Book.txt"].waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(app.staticTexts["TXT-Uppercase.TXT"].waitForExistence(timeout: 10), app.debugDescription)
             app.buttons["导入"].tap()
         }
         // Repeated runs preserve managed files and correctly add a numeric suffix.
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "TXT-Book")).firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "TXT-Uppercase")).firstMatch.waitForExistence(timeout: 15))
-        attach(app, name: "Local TXT books imported onto shelf")
+        let epubBook = app.staticTexts["EPUB 导入测试"].firstMatch
+        XCTAssertTrue(epubBook.waitForExistence(timeout: 15))
+        attach(app, name: "Local TXT and EPUB books imported onto shelf")
+        epubBook.tap()
+        let reader = app.webViews.firstMatch
+        XCTAssertTrue(reader.waitForExistence(timeout: 20))
+        XCTAssertTrue(reader.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是 EPUB 导入后的第一章正文")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(reader.images["测试插图"].waitForExistence(timeout: 10))
+        attach(app, name: "EPUB original layout with inline illustration")
+        app.buttons["目录"].tap()
+        app.buttons["第二章 EPUB"].firstMatch.tap()
+        let secondChapter = reader.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "目录锚点跳转成功")).firstMatch
+        XCTAssertTrue(secondChapter.waitForExistence(timeout: 10))
+        attach(app, name: "EPUB original layout after TOC navigation")
     }
 
     func testJSONFilePickerOffersOpenAndImportsSelectedFiles() throws {
@@ -167,7 +251,7 @@ final class RuleEditorUITests: XCTestCase {
         attach(app, name: "JSON import review after file picker dismissal")
         app.buttons["导入"].tap()
         if app.alerts.firstMatch.waitForExistence(timeout: 5) { app.alerts.buttons["好"].tap() }
-        XCTAssertTrue(app.staticTexts["文件导入 JSON 测试"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["文件导入 JSON 测试"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["文件导入大写扩展名测试"].exists)
     }
 

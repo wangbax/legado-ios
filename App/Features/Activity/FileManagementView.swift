@@ -126,7 +126,7 @@ struct FileManagementView: View {
                     Button("完成") { selecting = false; selection.removeAll() }
                 } else {
                     Menu {
-                        Button("导入 TXT 文件", systemImage: "square.and.arrow.down") { importsFile = true }
+                        Button("导入 TXT / EPUB", systemImage: "square.and.arrow.down") { importsFile = true }
                         if tab == 0 {
                             Button("选择文件", systemImage: "checkmark.circle") { selecting = true }
                                 .disabled(displayedFiles.isEmpty)
@@ -163,7 +163,7 @@ struct FileManagementView: View {
 
     private var importAndRenameView: some View {
         fileList
-        .readingTXTFileImporter(isPresented: $importsFile) { files in
+        .readingLocalBookFileImporter(isPresented: $importsFile) { files in
             Task { await model.importFiles(files, library: library) }
         } onError: { error in
             model.errorMessage = error.localizedDescription
@@ -177,7 +177,7 @@ struct FileManagementView: View {
                 Task { await model.run(library) { try await library.renameLocalFile(at: url, to: name) } }
             }
         } message: { _ in
-            Text("保留 TXT 格式，书架中的书名、书签和阅读进度不变。")
+            Text("保留原文件格式，书架中的书名、书签和阅读进度不变。")
         }
     }
 
@@ -239,8 +239,8 @@ struct FileManagementView: View {
         }
         Section("文件") {
             if displayedFiles.isEmpty {
-                ReadingUnavailableView(query.isEmpty ? "还没有本地文件" : "没有匹配的文件", systemImage: "doc.text", description: Text("可从系统“文件”导入 TXT，文件会复制到应用中。"))
-                Button("导入 TXT 文件", systemImage: "plus") { importsFile = true }
+                ReadingUnavailableView(query.isEmpty ? "还没有本地文件" : "没有匹配的文件", systemImage: "doc.text", description: Text("可从系统“文件”导入 TXT 或 EPUB，文件会复制到应用中。"))
+                Button("导入 TXT / EPUB", systemImage: "plus") { importsFile = true }
             }
             ForEach(displayedFiles) { file in
                 Group {

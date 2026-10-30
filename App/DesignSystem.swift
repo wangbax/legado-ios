@@ -300,11 +300,20 @@ struct BookCoverArtwork: View {
     }
 
     var body: some View {
-        AsyncImage(url: remoteURL.flatMap(URL.init(string:))) { phase in
-            if case .success(let image) = phase {
-                image.resizable().scaledToFill()
+        Group {
+            if let remoteURL, remoteURL.hasPrefix("data:image/"),
+               let comma = remoteURL.firstIndex(of: ","),
+               let data = Data(base64Encoded: String(remoteURL[remoteURL.index(after: comma)...])),
+               let image = UIImage(data: data) {
+                Image(uiImage: image).resizable().scaledToFill()
             } else {
-                placeholder
+                AsyncImage(url: remoteURL.flatMap(URL.init(string:))) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
             }
         }
         .frame(width: width, height: height)

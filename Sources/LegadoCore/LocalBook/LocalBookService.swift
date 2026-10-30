@@ -10,7 +10,7 @@ public enum LocalBookError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .unsupportedFormat: "当前仅支持 TXT 本地书"
+        case .unsupportedFormat: "当前支持 TXT 和 EPUB 本地书"
         case .oversized: "本地书超过当前配置允许的大小"
         case .unreadableEncoding: "无法识别 TXT 编码"
         case .missingFile: "本地书文件已丢失"
@@ -104,6 +104,55 @@ public struct LocalBookService: Sendable {
         LocalBookService(tocRules: TxtTocRuleDefaults.load())
     }
 
+    public static func supports(_ url: URL) -> Bool {
+        url.isFileURL && ["txt", "epub"].contains(url.pathExtension.lowercased())
+    }
+
+    public func loadCover(at url: URL) throws -> Data? {
+        guard url.isFileURL, url.pathExtension.lowercased() == "epub" else { return nil }
+        try validateFile(url)
+        return try EPUBBook(url: url).coverThumbnail()
+    }
+
+    public func openFile(at url: URL) throws -> LocalBookImportReport {
+        guard Self.supports(url) else { throw LocalBookError.unsupportedFormat }
+        if url.pathExtension.lowercased() == "epub" {
+            try validateFile(url)
+            return try EPUBBook(url: url).report(url: url, originalName: url.lastPathComponent)
+        }
+        return try openTextFile(at: url)
+    }
+
+    public func importFile(at source: URL, into directory: URL) throws -> LocalBookImportReport {
+        guard Self.supports(source) else { throw LocalBookError.unsupportedFormat }
+        try validateFile(source)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(UUID().uuidString + "." + source.pathExtension.lowercased())
+        try FileManager.default.copyItem(at: source, to: destination)
+        do {
+            if source.pathExtension.lowercased() == "epub" {
+                return try EPUBBook(url: destination).report(url: destination, originalName: source.lastPathComponent)
+            }
+            return try textFileReport(data: Data(contentsOf: destination, options: .mappedIfSafe), sourceURL: source, destination: destination)
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+
+    public func loadIllustrations(book: Book, chapter: BookChapter) throws -> [EPUBIllustration] {
+        guard let url = URL(string: book.bookUrl), url.isFileURL, url.pathExtension.lowercased() == "epub" else { return [] }
+        try validateFile(url)
+        return try EPUBBook(url: url).illustrations(chapter: chapter)
+    }
+
+    private func validateFile(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { throw LocalBookError.missingFile }
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else { throw LocalBookError.missingFile }
+        guard Int64(values.fileSize ?? 0) <= maximumFileSize else { throw LocalBookError.oversized }
+    }
+
     public func importTextFile(at sourceURL: URL, into directory: URL) throws -> LocalBookImportReport {
         guard sourceURL.pathExtension.lowercased() == "txt" else { throw LocalBookError.unsupportedFormat }
         let values = try sourceURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
@@ -181,6 +230,10 @@ public struct LocalBookService: Sendable {
     }
 
     public func loadChapters(book: Book) throws -> ChapterListReport {
+        if let url = URL(string: book.bookUrl), url.isFileURL, url.pathExtension.lowercased() == "epub" {
+            try validateFile(url)
+            return try .init(chapters: EPUBBook(url: url).chapters(book: book))
+        }
         let decoded = try read(book)
         let selectionVolumeState = TxtVolumeState()
         let probeText = textProbe(decoded.data, encoding: decoded.encoding)
@@ -201,6 +254,10 @@ public struct LocalBookService: Sendable {
     }
 
     public func loadContent(book: Book, chapter: BookChapter) throws -> ChapterContentReport {
+        if let url = URL(string: book.bookUrl), url.isFileURL, url.pathExtension.lowercased() == "epub" {
+            try validateFile(url)
+            return try EPUBBook(url: url).content(chapter: chapter)
+        }
         guard let url = URL(string: book.bookUrl), url.isFileURL,
               FileManager.default.fileExists(atPath: url.path) else { throw LocalBookError.missingFile }
         let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0

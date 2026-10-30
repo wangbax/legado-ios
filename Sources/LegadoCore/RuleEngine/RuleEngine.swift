@@ -57,11 +57,11 @@ public struct RuleEngine: Sendable {
                 return literalEvaluation(rendered.rule, context: rendered.context)
             }
             if rendered.context.variables != context.variables {
-                var result = await evaluatePrepared(rendered.rule, in: input, context: rendered.context)
+                var result = await evaluatePrepared(rendered.rule, in: input, listMode: listMode, context: rendered.context)
                 result.variables = rendered.context.variables.merging(result.variables) { _, new in new }
                 return result
             }
-            return await evaluatePrepared(rendered.rule, in: input, context: rendered.context)
+            return await evaluatePrepared(rendered.rule, in: input, listMode: listMode, context: rendered.context)
         } catch let error as RuleEngineError {
             return .init(diagnostics: [error.diagnostic], variables: context.variables)
         } catch {
@@ -72,6 +72,7 @@ public struct RuleEngine: Sendable {
     private func evaluatePrepared(
         _ rule: String,
         in input: JSONValue,
+        listMode: Bool,
         context: RuleExecutionContext
     ) async -> RuleEvaluation {
         do {
@@ -80,7 +81,8 @@ public struct RuleEngine: Sendable {
             var diagnostics: [RuleDiagnostic] = []
             for branch in plan.branches {
                 do {
-                    let values = try await evaluate(branch, in: input, context: context)
+                    var values = try await evaluate(branch, in: input, context: context)
+                    if plan.combination == .fallback, isEmpty(values, listMode: listMode) { values = [] }
                     results.append(values)
                     if plan.combination == .fallback, !values.isEmpty { break }
                 } catch let error as RuleEngineError {
@@ -97,7 +99,7 @@ public struct RuleEngine: Sendable {
                 }
             }
             return .init(
-                values: combine(results, with: plan.combination),
+                values: try applyingReplacement(to: combine(results, with: plan.combination), plan: plan, listMode: listMode),
                 diagnostics: diagnostics,
                 variables: context.variables
             )
@@ -174,6 +176,11 @@ public struct RuleEngine: Sendable {
         listMode: Bool,
         context: RuleExecutionContext
     ) async -> RuleEvaluation {
+        if let root = try? JSONValue.decode(data: Data(input.utf8)),
+           let plan = try? parser.parse(rule, inputLooksLikeJSON: true),
+           plan.branches.allSatisfy({ $0.mode == .jsonPath }) {
+            return await evaluatePrepared(rule, in: root, listMode: listMode, context: context)
+        }
         if rule.hasPrefix(":"), rule.count > 1 {
             do {
                 let patterns = rule.dropFirst().components(separatedBy: "&&").filter { !$0.isEmpty }
@@ -217,7 +224,7 @@ public struct RuleEngine: Sendable {
                 }
             }
             return .init(
-                values: combine(results, with: plan.combination),
+                values: try applyingReplacement(to: combine(results, with: plan.combination), plan: plan, listMode: listMode),
                 diagnostics: diagnostics,
                 variables: context.variables
             )
@@ -241,15 +248,11 @@ public struct RuleEngine: Sendable {
         try Task.checkCancellation()
         let rawValues: [JSONValue]
         if branch.expression.isEmpty {
-            return try [JSONValue.string(regex.replacing(
-                pattern: branch.replacePattern ?? "", in: input.stringValue,
-                with: branch.replacement, firstOnly: branch.replaceFirst
-            ))]
+            return [input]
         }
         switch branch.mode {
         case .jsonPath:
-            let path = branch.expression.hasPrefix("$") ? branch.expression : "$.\(branch.expression)"
-            rawValues = try jsonPath.evaluate(path: path, in: input)
+            rawValues = try jsonPath.evaluateRule(branch.expression, in: input)
         case .regex:
             let matches = try regex.captureGroups(pattern: branch.expression, input: input.stringValue)
             rawValues = matches.map { .array($0.map(JSONValue.string)) }
@@ -266,15 +269,7 @@ public struct RuleEngine: Sendable {
         case .webJavaScript:
             throw RuleEngineError.unsupportedRule(rule: branch.expression, feature: "WKWebView JavaScript")
         }
-        guard let pattern = branch.replacePattern, !pattern.isEmpty else { return rawValues }
-        return try rawValues.map {
-            .string(try regex.replacing(
-                pattern: pattern,
-                in: $0.stringValue,
-                with: branch.replacement,
-                firstOnly: branch.replaceFirst
-            ))
-        }
+        return rawValues
     }
 
     private func evaluateTextBranch(
@@ -287,10 +282,7 @@ public struct RuleEngine: Sendable {
         try Task.checkCancellation()
         let raw: [String]
         if branch.expression.isEmpty {
-            return try [regex.replacing(
-                pattern: branch.replacePattern ?? "", in: input,
-                with: branch.replacement, firstOnly: branch.replaceFirst
-            )]
+            return [input]
         }
         switch branch.mode {
         case .css:
@@ -308,8 +300,7 @@ public struct RuleEngine: Sendable {
             } catch {
                 throw RuleEngineError.invalidInput(rule: branch.expression, expected: "JSON")
             }
-            let path = branch.expression.hasPrefix("$") ? branch.expression : "$.\(branch.expression)"
-            raw = try jsonPath.evaluate(path: path, in: root).map(\.stringValue)
+            raw = try jsonPath.evaluateRule(branch.expression, in: root).map(\.stringValue)
         case .regex:
             raw = try regex.captureGroups(pattern: branch.expression, input: input).map { captures in
                 captures.count > 1 ? captures.dropFirst().joined() : captures.first ?? ""
@@ -323,14 +314,22 @@ public struct RuleEngine: Sendable {
         case .webJavaScript:
             throw RuleEngineError.unsupportedRule(rule: branch.expression, feature: "WKWebView JavaScript")
         }
-        guard let pattern = branch.replacePattern, !pattern.isEmpty else { return raw }
-        return try raw.map {
-            try regex.replacing(
-                pattern: pattern,
-                in: $0,
-                with: branch.replacement,
-                firstOnly: branch.replaceFirst
-            )
+        return raw
+    }
+
+    private func isEmpty(_ values: [JSONValue], listMode: Bool) -> Bool {
+        let result = RuleEvaluation(values: values)
+        return listMode
+            ? result.listItems(rule: "").filter { $0 != .null }.isEmpty
+            : result.strings.joined(separator: "\n").isEmpty
+    }
+
+    private func applyingReplacement(to values: [JSONValue], plan: RulePlan, listMode: Bool) throws -> [JSONValue] {
+        guard let branch = plan.branches.first, let pattern = branch.replacePattern, !pattern.isEmpty else { return values }
+        let strings = RuleEvaluation(values: values).strings
+        let inputs = listMode ? strings : [strings.joined(separator: "\n")]
+        return try inputs.map {
+            .string(try regex.replacing(pattern: pattern, in: $0, with: branch.replacement, firstOnly: branch.replaceFirst))
         }
     }
 

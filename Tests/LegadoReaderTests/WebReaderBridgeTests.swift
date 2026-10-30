@@ -88,3 +88,159 @@ final class WebReaderBridgeTests: XCTestCase {
         XCTAssertEqual(result as? String, "已保存|规则正文")
     }
 }
+
+private actor RSSPaginationTransport: HTTPTransport {
+    private var requests: [URL] = []
+    private var shouldFailSecondPage = true
+
+    func data(for request: URLRequest) async throws -> HTTPResponse {
+        let url = try XCTUnwrap(request.url)
+        requests.append(url)
+        if url.host == "unavailable.test" { throw URLError(.cannotConnectToHost) }
+        let page = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "page" }?.value ?? "1"
+        if page == "2", shouldFailSecondPage {
+            shouldFailSecondPage = false
+            throw URLError(.networkConnectionLost)
+        }
+        let body = "{\"items\":[{\"title\":\"Page \(page)\",\"link\":\"https://feed.test/article/\(page)\"}]}"
+        return .init(data: Data(body.utf8), statusCode: 200, headers: [:], finalURL: url)
+    }
+
+    func requestedPages() -> [String] {
+        requests.compactMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "page" }?.value }
+    }
+
+    func requestCount() -> Int { requests.count }
+}
+
+private actor RSSDelayedTransport: HTTPTransport {
+    let pausedHost: String
+    let pausedPage: String
+    private var requestTotal = 0
+    private var pending: CheckedContinuation<Void, Never>?
+
+    init(host: String, page: String) { pausedHost = host; pausedPage = page }
+
+    func data(for request: URLRequest) async throws -> HTTPResponse {
+        let url = try XCTUnwrap(request.url)
+        let page = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "page" }?.value ?? "1"
+        requestTotal += 1
+        if url.host == pausedHost, page == pausedPage {
+            await withCheckedContinuation { continuation in
+                pending = continuation
+            }
+        }
+        let body = "{\"items\":[{\"title\":\"Page \(page)\",\"link\":\"https://feed.test/article/\(page)\"}]}"
+        return .init(data: Data(body.utf8), statusCode: 200, headers: [:], finalURL: url)
+    }
+
+    func waitUntilPaused() async throws {
+        for _ in 0..<500 {
+            if pending != nil { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        throw URLError(.timedOut)
+    }
+
+    func resume() { pending?.resume(); pending = nil }
+    func requestCount() -> Int { requestTotal }
+}
+
+@MainActor
+final class RSSLibraryRegressionTests: XCTestCase {
+    func testUnavailableDatabaseDoesNotCrashOrPublishUnsavedImports() async throws {
+        let blocked = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("existing file".utf8).write(to: blocked)
+        defer { try? FileManager.default.removeItem(at: blocked) }
+        let model = RSSLibraryModel.live(databaseURL: blocked.appendingPathComponent("rss.sqlite3"))
+        XCTAssertNotNil(model.errorMessage)
+        await model.load()
+        XCTAssertNotNil(model.errorMessage)
+        let saved = await model.save(source(), replacing: nil)
+        XCTAssertFalse(saved)
+        await model.importText(#"{"sourceUrl":"https://feed.test","sourceName":"未保存的订阅"}"#)
+        XCTAssertTrue(model.sources.isEmpty)
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(try Data(contentsOf: blocked), Data("existing file".utf8))
+    }
+
+    private func source(host: String = "feed.test") -> RssSource {
+        var source = RssSource(sourceUrl: "https://\(host)", sourceName: host)
+        source.sortUrl = "https://\(host)/list?page={{page}}"
+        source.ruleArticles = "$.items"
+        source.ruleTitle = "$.title"
+        source.ruleLink = "$.link"
+        source.ruleNextPage = "PAGE"
+        return source
+    }
+
+    func testFailedNextPageRetriesTheSamePageWithoutSkippingArticles() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let database = try LegadoDatabase(url: directory.appendingPathComponent("rss.sqlite3"))
+        let transport = RSSPaginationTransport()
+        let model = RSSLibraryModel(database: database, service: RSSService(transport: transport))
+        let feed = source()
+        await model.refresh(feed)
+        XCTAssertEqual(model.articles.map(\.title), ["Page 1"])
+        await model.loadMore(feed)
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertEqual(model.articles.map(\.title), ["Page 1"])
+        await model.loadMore(feed)
+        let pages = await transport.requestedPages()
+        XCTAssertEqual(pages, ["1", "2", "2"])
+        XCTAssertEqual(model.articles.map(\.title), ["Page 1", "Page 2"])
+    }
+
+    func testFailedSourceChangeDoesNotReusePreviousSourcesArticlesOrNextPage() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let database = try LegadoDatabase(url: directory.appendingPathComponent("rss.sqlite3"))
+        let transport = RSSPaginationTransport()
+        let model = RSSLibraryModel(database: database, service: RSSService(transport: transport))
+        await model.refresh(source())
+        let unavailable = source(host: "unavailable.test")
+        await model.refresh(unavailable)
+        XCTAssertTrue(model.articles.isEmpty)
+        let count = await transport.requestCount()
+        await model.loadMore(unavailable)
+        let afterLoadMore = await transport.requestCount()
+        XCTAssertEqual(afterLoadMore, count)
+    }
+
+    func testSlowPreviousSourceCannotReplaceTheCurrentFeed() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let database = try LegadoDatabase(url: directory.appendingPathComponent("rss.sqlite3"))
+        let transport = RSSDelayedTransport(host: "slow.test", page: "1")
+        let model = RSSLibraryModel(database: database, service: RSSService(transport: transport))
+        let slow = Task { await model.refresh(source(host: "slow.test")) }
+        try await transport.waitUntilPaused()
+        await model.refresh(source())
+        XCTAssertTrue(model.isWorking)
+        await transport.resume()
+        await slow.value
+        XCTAssertEqual(model.articles.map(\.origin), ["https://feed.test"])
+        XCTAssertFalse(model.isWorking)
+    }
+
+    func testRepeatedLoadMoreWhileWaitingRequestsOnlyOnePage() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let database = try LegadoDatabase(url: directory.appendingPathComponent("rss.sqlite3"))
+        let transport = RSSDelayedTransport(host: "feed.test", page: "2")
+        let model = RSSLibraryModel(database: database, service: RSSService(transport: transport))
+        let feed = source()
+        await model.refresh(feed)
+        let pending = Task { await model.loadMore(feed) }
+        try await transport.waitUntilPaused()
+        await model.loadMore(feed)
+        let count = await transport.requestCount()
+        XCTAssertEqual(count, 2)
+        await transport.resume()
+        await pending.value
+        XCTAssertEqual(model.articles.map(\.title), ["Page 1", "Page 2"])
+    }
+}

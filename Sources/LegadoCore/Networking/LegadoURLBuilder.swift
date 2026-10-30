@@ -548,17 +548,32 @@ public struct LegadoURLBuilder: Sendable {
             case "{", ",":
                 output.append(character)
                 expectingKey = true
-            case ":":
-                output.append(character)
+            case ":", "=":
+                // Gson also accepts = and => between an object key and value.
+                // Quoted strings are consumed above, so Cookie/URL values stay intact.
+                output.append(":")
+                if character == "=", peek() == ">" { index += 1 }
                 expectingKey = false
-                if quoteUnquotedValues {
+                do {
                     var start = index
                     while start < characters.count, characters[start].isWhitespace { start += 1 }
                     if start < characters.count, !["\"", "'", "{", "[", "}", ","].contains(characters[start]) {
                         var end = start
-                        while end < characters.count, characters[end] != ",", characters[end] != "}" { end += 1 }
-                        output.append(escapedJSONString(String(characters[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)))
-                        index = end
+                        if quoteUnquotedValues {
+                            // @put values are rules, including unquoted JSONPath expressions.
+                            while end < characters.count, characters[end] != ",", characters[end] != "}" { end += 1 }
+                        } else {
+                            while end < characters.count, !characters[end].isWhitespace,
+                                  ![",", "}", "]", "{", "[", ":", ";", "=", "/", "#", "\\"].contains(characters[end]) { end += 1 }
+                        }
+                        if end > start {
+                            let token = String(characters[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            let literal = token.lowercased()
+                            let isLiteral = ["true", "false", "null"].contains(literal)
+                                || token.range(of: #"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil
+                            output.append(!quoteUnquotedValues && isLiteral ? literal : escapedJSONString(token))
+                            index = end
+                        }
                     }
                 }
             case "}", "]":
@@ -580,7 +595,7 @@ public struct LegadoURLBuilder: Sendable {
                     while peekPosition < characters.count, characters[peekPosition].isWhitespace {
                         peekPosition += 1
                     }
-                    if peekPosition < characters.count, characters[peekPosition] == ":" {
+                    if peekPosition < characters.count, [":", "="].contains(characters[peekPosition]) {
                         output.removeLast()
                         output.append(escapedJSONString(name))
                         index = position
@@ -611,7 +626,7 @@ public struct LegadoURLBuilder: Sendable {
         let parsed: JSONValue
         if case .string(let source) = value {
             do {
-                parsed = try JSONValue.decode(data: Data(source.utf8))
+                parsed = try Self.decodeLenientJSON(source)
             } catch {
                 throw RuleEngineError.malformedRule(rule: rule, detail: "headers JSON 无效")
             }

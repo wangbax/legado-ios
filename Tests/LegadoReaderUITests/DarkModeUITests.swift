@@ -80,11 +80,14 @@ final class DarkModeUITests: XCTestCase {
             let keyboard = try luminances(app.keyboards.firstMatch, in: app)
             XCTAssertLessThan(keyboard[keyboard.count / 2], 0.15)
         }
-        let accessory = app.buttons["完成"]
-        let accessoryFrame = accessory.frame.intersection(app.frame)
-        if accessory.isHittable && !accessoryFrame.isNull && accessoryFrame.width > 20 && accessoryFrame.height > 20 {
-            try assertReadableDarkFill(accessory, in: app)
-        }
+        let accessory = app.buttons["syntaxCodeEditor.done"]
+        XCTAssertTrue(accessory.exists && accessory.isHittable)
+        try assertReadableDarkFill(accessory, in: app)
+        app.buttons["@"].tap()
+        XCTAssertTrue((app.textViews["syntaxCodeEditor"].value as? String)?.contains("@") == true)
+        accessory.tap()
+        let dismissed = expectation(for: NSPredicate { _, _ in !accessory.exists || !accessory.isHittable }, evaluatedWith: nil)
+        wait(for: [dismissed], timeout: 5)
     }
 
     func testDarkSettingsRulesAndManagementPages() throws {
@@ -147,8 +150,8 @@ final class DarkModeUITests: XCTestCase {
         let app = launch(["-uiDemoTab", "search", "-themeMode", "2", "-uiAutomationSearch", "深色外观检查"])
         let cancelSearch = app.buttons.matching(NSPredicate(format: "label IN %@", ["取消", "Cancel"])).firstMatch
         if cancelSearch.waitForExistence(timeout: 3) { cancelSearch.tap() }
-        XCTAssertTrue(app.buttons["搜索选项"].waitForExistence(timeout: 10))
-        app.buttons["搜索选项"].tap()
+        XCTAssertTrue(app.buttons["search.options"].waitForExistence(timeout: 10))
+        app.buttons["search.options"].tap()
         app.buttons["分组或书源"].tap()
         XCTAssertTrue(app.navigationBars["分组或书源"].waitForExistence(timeout: 5))
         try captureDarkPage(app, name: "Search group filter")

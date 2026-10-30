@@ -2,14 +2,14 @@
 
 ## 环境
 
-- macOS；Xcode 27 或更新版本（Google Sign-In 10.x 的构建要求），当前开发环境为 Xcode 27.1。
+- macOS；支持 Swift 6 的 Xcode，当前开发环境为 Xcode 26.1。
 - App 最低 iOS 15.0；核心包也可在 macOS 14+ 测试。
 - Swift Package Manager 依赖由 `Package.resolved` 锁定，初次解析需要网络。
 - 运行脚本需 Python 3 和 `rg`（ripgrep）。
 
 在独立仓库根目录打开 `Legado.xcodeproj`，选择 `Legado` Scheme。真机运行需要自行设置签名团队；请勿将证书或描述文件提交到仓库。
 
-备份、WebDAV、Google Drive 配置与可选 iCloud 签名见 [备份与同步](BACKUP_SYNC.md)。
+备份、WebDAV、Google Drive OAuth 构建配置及可选 iCloud 权限见 [备份与同步](BACKUP_SYNC.md)。Google Sign-In 依赖已锁定，本次验证环境为 Xcode 27.1；仍需维护者验证其发行构建环境。
 
 ## 代码结构
 
@@ -43,7 +43,7 @@ sh scripts/self-check.sh
 
 阅读器测试在 Xcode 选择 `LegadoReaderTests` / `LegadoReaderUITests` Scheme 和具体模拟器运行。联网书源测试需要显式配置对应环境变量，默认核心回归主要采用自造响应，不能将其通过解读为所有线上书源均可用。
 
-书源和本地 TXT 文件选择回归需要先在已启动的测试模拟器中准备文件共享应用（将下方 UUID 换成实际值）：
+书源和本地 TXT / EPUB 文件选择回归需要先在已启动的测试模拟器中准备文件共享应用（将下方 UUID 换成实际值）：
 
 ```sh
 LEGADO_TEST_DEVICE="模拟器 UUID"
@@ -51,12 +51,18 @@ sh scripts/prepare-source-import-fixture.sh "$LEGADO_TEST_DEVICE"
 xcodebuild -project Legado.xcodeproj -scheme LegadoReaderUITests \
   -destination "platform=iOS Simulator,id=$LEGADO_TEST_DEVICE" \
   -only-testing:LegadoReaderUITests/RuleEditorUITests/testJSONFilePickerOffersOpenAndImportsSelectedFiles \
-  -only-testing:LegadoReaderUITests/RuleEditorUITests/testBookshelfTXTFilePickerImportsTXTAndDisablesJSON \
-  -only-testing:LegadoReaderUITests/RuleEditorUITests/testFileManagementTXTFilePickerImportsTXTAndDisablesJSON \
+  -only-testing:LegadoReaderUITests/RuleEditorUITests/testBookshelfFilePickerImportsTXTAndEPUBAndDisablesJSON \
+  -only-testing:LegadoReaderUITests/RuleEditorUITests/testFileManagementFilePickerImportsTXTAndEPUBAndDisablesJSON \
   -collect-test-diagnostics never CODE_SIGNING_ALLOWED=NO test
 ```
 
-独立测试应用提供 JSON 书源和 `.txt`、`.TXT` 小说样本，不会被打包进正式 App。此回归检查取消后重新打开、书源 JSON 多选、本地 TXT 可选且 JSON 不可选、导入确认及最终保存。
+独立测试应用提供 JSON 书源和 `.txt`、`.TXT`、`.epub` 小说样本，不会被打包进正式 App。此回归检查取消后重新打开、书源 JSON 多选、本地 TXT / EPUB 可选且 JSON 不可选、导入确认、最终保存、EPUB 正文、插图与目录跳转。
+
+测试夹具仅在内容变化时原位写入文件，保持文件标识稳定。iOS 26 模拟器的 Files 提供器可能在样本被原子替换后返回「文件不存在」，导致已勾选文件未回传；遇到旧夹具残留时，卸载模拟器中的「书源导入测试」后重新运行准备脚本。
+
+RSS 的导入、源内搜索、分页、正文、收藏以及重启恢复可通过本地自造响应回归，避免依赖第三方网站。先在一个终端运行 `python3 scripts/fixtures/rss-flow-server.py`，再在 Xcode 选择 `LegadoRSSFlowUITests` Scheme 和模拟器运行；也可用 `xcodebuild -project Legado.xcodeproj -scheme LegadoRSSFlowUITests -destination 'platform=iOS Simulator,id=模拟器UUID' CODE_SIGNING_ALLOWED=NO test`。该服务仅监听本机 `127.0.0.1:18763`，测试结束后按 Ctrl-C 停止。普通 UI Scheme 默认跳过此用例。
+
+RSS 界面回归还验证正文的手动刷新确实重新请求网络。核心与页面模型回归覆盖查询隔离、刷新失败后的分页重试、重定向链接、文章变量、并发开关、书签与阅读记录保存顺序，以及自动更新过程中删除规则订阅；这些用例均使用临时数据库和自造响应，不访问个人书架。
 
 ## 兼容性验证
 
@@ -103,7 +109,7 @@ source_release_tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[
 gh release download "$source_release_tag" --repo Aminark/legado-ios \
   --pattern '*.ipa' --dir "$source_update_dir"
 python3 scripts/update-altstore-source.py \
-  --ipa "$source_update_dir/legado-ios-v0.1.11-build17-unsigned.ipa" \
+  --ipa "$source_update_dir/legado-ios-v0.1.14-build20-unsigned.ipa" \
   --release "$source_update_dir/release.json"
 python3 -m unittest discover -s scripts/tests -v
 ```
@@ -113,3 +119,11 @@ python3 -m unittest discover -s scripts/tests -v
 发布后检查固定地址可匿名访问、图标和截图能正常加载，并下载源中 IPA 再核对大小、摘要和版本。客户端的添加源、安装、更新与签名流程需分别实测；源文件校验通过不代表已完成真机安装验证。
 
 格式说明：[AltStore 源规范](https://faq.altstore.io/developers/make-a-source)、[SideStore 源字段](https://sidestore.io/sidestore-source-types/interfaces/Source.html)、[LiveContainer 源用法](https://livecontainer.github.io/docs/guides/sources)。
+
+## EPUB 回归
+
+`swift test --disable-sandbox --filter EPUB` 覆盖 EPUB 2/3 元数据、中文资源路径、同页锚点、无目录降级、书脊顺序、插图、损坏与加密文件、重命名导出、导入失败回滚和阅读进度恢复。样本均由测试自行生成，不依赖网络或第三方书籍。
+
+核心解析器按需读取 ZIP 资源，不解压到磁盘；单资源上限为 32 MiB。它用于导入、书架元数据和文字朗读。EPUB 原排版阅读由 Readium 3.8.0 的 Streamer / Navigator 处理，保留 XHTML、CSS、SVG 和内嵌插图；不接入 DRM 解密服务。原排版位置和书签使用 EPUB locator 保存，旧的文字进度仍兼容。
+
+`LegadoReaderTests/EPUBReaderIntegrationTests` 在 iOS 中实际渲染自造 EPUB，检查 SVG 封面、相对路径图片、外部 CSS、表格、目录跳转和字号变化后的续读。可通过 `xcodebuild -project Legado.xcodeproj -scheme LegadoReaderTests -destination 'platform=iOS Simulator,id=模拟器UUID' -only-testing:LegadoReaderTests/EPUBReaderIntegrationTests CODE_SIGNING_ALLOWED=NO test` 运行。真实书籍样例仅用于本机验证，不放进仓库。

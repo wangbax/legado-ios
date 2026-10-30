@@ -33,16 +33,20 @@ struct LocalBookDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 VStack(spacing: 14) {
-                    BookCoverArtwork(title: book.name, author: book.author, width: 108, height: 154)
+                    BookCoverArtwork(title: book.name, author: book.author, remoteURL: book.customCoverUrl ?? book.coverUrl, width: 108, height: 154)
                     Text(book.name).font(.title2.bold())
+                    if !book.author.isEmpty { Text(book.author).font(.subheadline).foregroundStyle(.secondary) }
                     HStack {
-                        StatusPill(text: "本地 TXT", systemImage: "doc.text.fill")
+                        StatusPill(text: "本地 " + (URL(string: book.bookUrl)?.pathExtension.uppercased() ?? "TXT"), systemImage: "doc.text.fill")
                         if let charset = book.charset { StatusPill(text: charset, color: ReadingTheme.coral, systemImage: "character") }
                     }
                     Text(book.originName).font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(.top, 12)
 
+                if let intro = book.intro, !intro.isEmpty {
+                    ReadingCard { Text(intro).font(.subheadline).frame(maxWidth: .infinity, alignment: .leading) }
+                }
                 ReadingCard {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack {

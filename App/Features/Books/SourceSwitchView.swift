@@ -278,7 +278,7 @@ struct SourceSwitchView: View {
         }
         .disabled(model.isSwitching)
         .accessibilityHint("预览当前章节，确认后换源")
-        .accessibilityIdentifier("sourceSwitch.candidate.\(candidate.book.origin)")
+        .accessibilityIdentifier("sourceSwitch.candidate.\(candidate.id)")
     }
 
     private func verificationColor(_ candidate: BookSourceCandidate) -> Color {

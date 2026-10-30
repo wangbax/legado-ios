@@ -64,7 +64,8 @@ final class SearchViewModel: ObservableObject {
         pendingSourceIDs = Set(pendingSources.map(\.id))
         pagedSources = pendingSources.filter {
             let url = $0.searchUrl ?? ""
-            return url.contains("{{page}}") || url.contains("searchPage") || url.contains("<")
+            return url.range(of: #"\{\{[^}]*\bpage\b[^}]*\}\}"#, options: .regularExpression) != nil
+                || url.contains("searchPage") || url.contains("<")
         }
         sourceNames = Dictionary(pendingSources.map { ($0.id, $0.bookSourceName) }, uniquingKeysWith: { first, _ in first })
         accumulator = .init()

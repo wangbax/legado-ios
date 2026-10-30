@@ -209,14 +209,40 @@ public struct JavaScriptRuleEvaluator: Sendable {
         result: JSONValue,
         executionContext: RuleExecutionContext
     ) throws -> JavaScriptRuleResult {
+        try evaluate(script: script, result: result, executionContext: executionContext,
+                     virtualMachine: JSVirtualMachine(), stringifyResult: false)
+    }
+
+    /// A rule shares java.get/put storage, but each match gets fresh JS globals.
+    /// Keep this closure on the synchronous replacement call's thread.
+    func replacementEvaluator(script: String, book: Book, chapter: BookChapter) -> (String) throws -> String {
+        var virtualMachine: JSVirtualMachine?
+        var executionContext = RuleExecutionContext(book: book, chapter: chapter)
+        return { match in
+            if virtualMachine == nil { virtualMachine = JSVirtualMachine() }
+            let result = try autoreleasepool {
+                try evaluate(script: script, result: .string(match), executionContext: executionContext,
+                             virtualMachine: virtualMachine!, stringifyResult: true)
+            }
+            executionContext.variables = result.variables
+            return result.value.stringValue
+        }
+    }
+
+    private func evaluate(
+        script: String,
+        result: JSONValue,
+        executionContext: RuleExecutionContext,
+        virtualMachine: JSVirtualMachine,
+        stringifyResult: Bool
+    ) throws -> JavaScriptRuleResult {
         guard script.utf8.count <= maximumScriptLength else {
             throw RuleEngineError.resourceLimit(rule: script, detail: "JavaScript 规则超过长度上限")
         }
         try rejectUnboundedExecution(script)
 
         let box = JSVariableBox(executionContext.variables)
-        let vm = JSVirtualMachine()
-        guard let context = JSContext(virtualMachine: vm) else {
+        guard let context = JSContext(virtualMachine: virtualMachine) else {
             throw RuleEngineError.invalidInput(rule: script, expected: "无法创建 JavaScriptCore 上下文")
         }
         var exceptionMessage: String?
@@ -271,7 +297,28 @@ public struct JavaScriptRuleEvaluator: Sendable {
         let normalized = evaluated.flatMap {
             context.objectForKeyedSubscript("__legadoUnboxString")?.call(withArguments: [$0])
         }
-        let value = JSONValue.bridge(normalized?.toObject())
+        let value: JSONValue
+        if stringifyResult {
+            // Rhino unwraps undefined to null before RegexExtensions.kt calls
+            // toString(). Preserve strings directly, rather than JSON encoding.
+            if let evaluated, !evaluated.isUndefined, !evaluated.isNull {
+                let text = evaluated.toString() ?? "null"
+                if evaluated.isNumber {
+                    // The reference runs Rhino in interpreted mode, yielding JVM Doubles.
+                    let number = evaluated.toDouble()
+                    value = .string(number.isFinite ? String(number) : text)
+                } else {
+                    value = .string(text)
+                }
+            } else {
+                value = .string("null")
+            }
+        } else {
+            value = JSONValue.bridge(normalized?.toObject())
+        }
+        if let exceptionMessage {
+            throw RuleEngineError.malformedRule(rule: script, detail: "JavaScript 执行失败：\(exceptionMessage)")
+        }
         guard value.stringValue.utf8.count <= maximumResultLength else {
             throw RuleEngineError.resourceLimit(rule: script, detail: "JavaScript 结果超过长度上限")
         }
@@ -974,53 +1021,48 @@ public struct JavaScriptRuleEvaluator: Sendable {
             return resolveJavaScriptRuleURL(direct.stringValue, enabled: isURL, context: executionContext)
         }
 
-        let plan = try RuleExpressionParser().parse(trimmedRule)
+        let jsonContent: JSONValue?
+        if case .string(let text) = content { jsonContent = try? JSONValue.decode(data: Data(text.utf8)) }
+        else { jsonContent = content }
+        let plan = try RuleExpressionParser().parse(trimmedRule, inputLooksLikeJSON: jsonContent != nil)
         var branchResults: [[String]] = []
         for branch in plan.branches {
             var values: [String]
-            switch branch.mode {
-            case .css:
-                values = try HTMLRuleEvaluator().extractCSS(
-                    branch.expression,
-                    html: content.stringValue,
-                    baseURL: executionContext.baseURL,
-                    isFragment: executionContext.isHTMLFragment
-                )
-            case .xpath:
-                values = try HTMLRuleEvaluator().extractXPath(branch.expression, html: content.stringValue, isFragment: executionContext.isHTMLFragment)
-            case .jsonPath:
-                let json: JSONValue
-                if case .string(let text) = content {
-                    json = try JSONValue.decode(data: Data(text.utf8))
-                } else {
-                    json = content
-                }
-                let path = branch.expression.hasPrefix("$") ? branch.expression : "." + branch.expression
-                let normalizedPath = path.hasPrefix("$") ? path : "$" + path
-                values = try JSONPathEvaluator().evaluate(path: normalizedPath, in: json)
-                    .map(\.stringValue)
-            case .regex:
-                values = try RegexEvaluator().captureGroups(pattern: branch.expression, input: content.stringValue)
-                    .map { $0.count > 1 ? $0.dropFirst().joined() : $0.first ?? "" }
-            case .javaScript:
-                values = [try evaluate(
-                    script: branch.expression,
-                    result: content,
-                    executionContext: executionContext
-                ).value.stringValue]
-            case .webJavaScript:
-                throw RuleEngineError.unsupportedRule(rule: branch.expression, feature: "java.getString WebView JavaScript")
-            }
-            if let pattern = branch.replacePattern, !pattern.isEmpty {
-                values = try values.map {
-                    try RegexEvaluator().replacing(
-                        pattern: pattern,
-                        in: $0,
-                        with: branch.replacement,
-                        firstOnly: branch.replaceFirst
+            if branch.expression.isEmpty {
+                values = [content.stringValue]
+            } else {
+                switch branch.mode {
+                case .css:
+                    values = try HTMLRuleEvaluator().extractCSS(
+                        branch.expression,
+                        html: content.stringValue,
+                        baseURL: executionContext.baseURL,
+                        isFragment: executionContext.isHTMLFragment
                     )
+                case .xpath:
+                    values = try HTMLRuleEvaluator().extractXPath(branch.expression, html: content.stringValue, isFragment: executionContext.isHTMLFragment)
+                case .jsonPath:
+                    let json: JSONValue
+                    if case .string(let text) = content {
+                        json = try JSONValue.decode(data: Data(text.utf8))
+                    } else {
+                        json = content
+                    }
+                    values = RuleEvaluation(values: try JSONPathEvaluator().evaluateRule(branch.expression, in: json)).strings
+                case .regex:
+                    values = try RegexEvaluator().captureGroups(pattern: branch.expression, input: content.stringValue)
+                        .map { $0.count > 1 ? $0.dropFirst().joined() : $0.first ?? "" }
+                case .javaScript:
+                    values = [try evaluate(
+                        script: branch.expression,
+                        result: content,
+                        executionContext: executionContext
+                    ).value.stringValue]
+                case .webJavaScript:
+                    throw RuleEngineError.unsupportedRule(rule: branch.expression, feature: "java.getString WebView JavaScript")
                 }
             }
+            if plan.combination == .fallback, values.joined(separator: "\n").isEmpty { values = [] }
             branchResults.append(values)
             if plan.combination == .fallback, !values.isEmpty { break }
         }
@@ -1037,7 +1079,11 @@ public struct JavaScriptRuleEvaluator: Sendable {
                 branchResults.compactMap { $0.indices.contains(index) ? $0[index] : nil }
             }
         }
-        return resolveJavaScriptRuleURL(combined.joined(separator: "\n"), enabled: isURL, context: executionContext)
+        var result = combined.joined(separator: "\n")
+        if let branch = plan.branches.first, let pattern = branch.replacePattern, !pattern.isEmpty {
+            result = try RegexEvaluator().replacing(pattern: pattern, in: result, with: branch.replacement, firstOnly: branch.replaceFirst)
+        }
+        return resolveJavaScriptRuleURL(result, enabled: isURL, context: executionContext)
     }
 
     private func resolveJavaScriptRuleURL(

@@ -5,6 +5,26 @@ import LegadoCore
 
 @MainActor
 struct SearchRegressionTests {
+    @Test func arithmeticPageExpressionCanLoadTheSecondPage() async throws {
+        let transport = GatedModelSearchTransport()
+        await transport.release()
+        let model = model(transport: transport, repository: InMemorySearchBookRepository())
+        defer { model.cancel(reset: true) }
+        var source = source("formula")
+        source.searchUrl = #"/search,{"method":"POST","body":"keyword={{key}}&page={{page-1}}"}"#
+        model.search(keyword: "书", sources: [source])
+        try await waitUntil { model.state == .finished }
+        #expect(model.hasMore)
+        model.loadMore()
+        try await waitUntil { !model.isLoadingMore }
+        let requests = await transport.requests()
+        #expect(requests.count == 2)
+        #expect(requests.compactMap(\.httpBody).map { String(decoding: $0, as: UTF8.self) } == [
+            "keyword=%E4%B9%A6&page=0", "keyword=%E4%B9%A6&page=1"
+        ])
+        #expect(!model.hasMore)
+    }
+
     @Test func cachedResultsAppearBeforeNetworkAndFreshResultsReplaceTheirMetadata() async throws {
         let source = source("slow")
         let cached = SearchBook(bookURL: source.id + "/cached", origin: source.id, originName: "源", type: 0, name: "书", author: "作者")

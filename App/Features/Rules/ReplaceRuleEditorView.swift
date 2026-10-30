@@ -92,9 +92,10 @@ struct ReplaceRuleEditorView: View {
                     RuleCodeFieldView(title: "匹配内容", path: "pattern", text: $rule.pattern, language: .regex)
                 } label: { fieldPreview("匹配内容", value: rule.pattern) }
                 NavigationLink {
-                    RuleCodeFieldView(title: "替换为", path: "replacement", text: $rule.replacement, language: .regex)
+                    RuleCodeFieldView(title: "替换为", path: "replacement", text: $rule.replacement,
+                        language: rule.isRegex && rule.replacement.hasPrefix("@js:") ? .javascript : .regex)
                 } label: { fieldPreview("替换为（留空即删除）", value: rule.replacement) }
-                Text("正则替换使用 $1、$2 引用捕获组；普通文本替换按字面匹配。")
+                Text("正则替换使用 $1、$2 引用捕获组；以 @js: 开头可运行 JavaScript，result 为当前匹配文本，可读取 book 和 chapter。普通文本替换按字面匹配。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("作用范围") {

@@ -388,9 +388,23 @@ struct LegadoDatabaseTests {
         )
         #expect(report.result.articles.map(\.title) == ["乙", "甲"])
         #expect(report.result.articles.first?.link == "https://rss.example/b")
-        #expect(report.result.articles.first?.image == "https://rss.example/root/b.jpg")
+        #expect(report.result.articles.first?.image == "https://rss.example/b.jpg")
         #expect(report.result.articles.first?.type == 2)
         #expect(report.result.nextURL == "https://rss.example/list?page=1")
+    }
+
+    @Test func rssJSONListWithoutWildcardExtractsIndividualArticles() async throws {
+        var source = RssSource(sourceUrl: "https://rss.example", sourceName: "JSON 订阅")
+        source.ruleArticles = "$.items"
+        source.ruleTitle = "$.title"
+        source.ruleLink = "$.link"
+        let report = try await RSSRuleParser().parse(
+            sortName: "全部", sortURL: "https://rss.example/feed", redirectURL: "https://rss.example/feed",
+            body: #"{"items":[{"title":"第一篇","link":"/one"},{"title":"第二篇","link":"/two"}]}"#,
+            source: source
+        )
+        #expect(report.result.articles.map(\.title) == ["第一篇", "第二篇"])
+        #expect(report.result.articles.map(\.link) == ["https://rss.example/one", "https://rss.example/two"])
     }
 
     @Test func rssSourceImporterSupportsObjectArrayManifestAndUpdateSelection() throws {

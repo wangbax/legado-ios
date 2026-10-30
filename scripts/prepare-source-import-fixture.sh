@@ -40,6 +40,7 @@ xcrun --sdk iphonesimulator swiftc -parse-as-library -swift-version 6 \
     -module-cache-path "$legado_fixture_repo/DerivedData/ModuleCache.noindex" \
     "$legado_fixture_repo/scripts/fixtures/SourceImportFixture.swift" \
     -o "$legado_fixture_app/SourceImportFixtures"
+python3 "$legado_fixture_repo/scripts/fixtures/make-epub.py" "$legado_fixture_app/EPUB-Book.epub"
 xcrun simctl install "$legado_fixture_device" "$legado_fixture_app"
 xcrun simctl launch --terminate-running-process "$legado_fixture_device" com.epiboly.legado.source-import-fixtures
-printf 'JSON and TXT import fixtures are ready in Files > On My iPhone > 书源导入测试.\n'
+printf 'JSON, TXT and EPUB import fixtures are ready in Files > On My iPhone > 书源导入测试.\n'

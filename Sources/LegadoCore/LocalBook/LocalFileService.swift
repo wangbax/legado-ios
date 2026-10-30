@@ -32,7 +32,7 @@ public struct StagedLocalFile: Sendable {
 public actor LocalFileService {
     public let directory: URL
 
-    public init(directory: URL) { self.directory = directory.standardizedFileURL }
+    public init(directory: URL) { self.directory = URL(fileURLWithPath: directory.path, isDirectory: true).standardizedFileURL }
 
     public func list() throws -> [LocalFileEntry] {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
@@ -41,21 +41,24 @@ public actor LocalFileService {
             options: [.skipsHiddenFiles]
         ).compactMap { url in
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
-            guard values.isRegularFile == true, values.isSymbolicLink != true, url.pathExtension.lowercased() == "txt" else { return nil }
+            guard values.isRegularFile == true, values.isSymbolicLink != true, LocalBookService.supports(url) else { return nil }
             return .init(url: url, bytes: Int64(values.fileSize ?? 0), modified: values.contentModificationDate)
         }.sorted { $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending }
     }
 
     public func importFile(from source: URL) throws -> URL {
-        guard source.pathExtension.lowercased() == "txt" else { throw LocalBookError.unsupportedFormat }
+        guard LocalBookService.supports(source) else { throw LocalBookError.unsupportedFormat }
         let values = try source.resourceValues(forKeys: [.isRegularFileKey])
         guard values.isRegularFile == true else { throw LocalFileError.missingFile }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // File providers can preserve the extension's case differently between
+        // imports. Reserve names case-insensitively before asking Cocoa to copy.
+        let occupiedNames = Set(try FileManager.default.contentsOfDirectory(atPath: directory.path).map { $0.lowercased() })
         let stem = source.deletingPathExtension().lastPathComponent
         var target = directory.appendingPathComponent(source.lastPathComponent)
         var suffix = 2
-        while FileManager.default.fileExists(atPath: target.path) {
-            target = directory.appendingPathComponent("\(stem) (\(suffix)).txt")
+        while occupiedNames.contains(target.lastPathComponent.lowercased()) || FileManager.default.fileExists(atPath: target.path) {
+            target = directory.appendingPathComponent("\(stem) (\(suffix)).\(source.pathExtension)")
             suffix += 1
         }
         try FileManager.default.copyItem(at: source, to: target)
@@ -69,7 +72,8 @@ public actor LocalFileService {
               !trimmed.contains(where: { $0 == "/" || $0 == "\\" || $0.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) }) else {
             throw LocalFileError.invalidName
         }
-        let filename = trimmed.lowercased().hasSuffix(".txt") ? trimmed : trimmed + ".txt"
+        let suffix = "." + source.pathExtension
+        let filename = trimmed.lowercased().hasSuffix(suffix.lowercased()) ? trimmed : trimmed + suffix
         guard filename.utf8.count <= 255 else { throw LocalFileError.invalidName }
         let target = directory.appendingPathComponent(filename)
         if source.standardizedFileURL == target.standardizedFileURL { return source }
@@ -83,7 +87,7 @@ public actor LocalFileService {
         guard FileManager.default.fileExists(atPath: source.path) else { return nil }
         let trash = directory.appendingPathComponent(".Trash", isDirectory: true)
         try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-        let staged = trash.appendingPathComponent(UUID().uuidString + ".txt")
+        let staged = trash.appendingPathComponent(UUID().uuidString + "." + source.pathExtension)
         try FileManager.default.moveItem(at: source, to: staged)
         return .init(original: source, staged: staged)
     }
@@ -104,7 +108,7 @@ public actor LocalFileService {
     }
 
     private func validate(_ url: URL, allowMissing: Bool = false) throws {
-        guard url.isFileURL, url.pathExtension.lowercased() == "txt",
+        guard url.isFileURL, LocalBookService.supports(url),
               url.standardizedFileURL.deletingLastPathComponent() == directory,
               url.resolvingSymlinksInPath().deletingLastPathComponent() == directory.resolvingSymlinksInPath() else {
             throw LocalFileError.outsideLibrary
@@ -131,7 +135,7 @@ public actor BookFileExporter {
     }
 
     public func originalFile(_ source: URL, filename: String) throws -> BookFileExport {
-        let target = try destination(filename: filename)
+        let target = try destination(filename: filename, extension: source.pathExtension.lowercased())
         do {
             try FileManager.default.copyItem(at: source, to: target)
             return .init(url: target, cachedChapters: 0, totalChapters: 0)
@@ -178,11 +182,11 @@ public actor BookFileExporter {
         try FileManager.default.removeItem(at: export.url.deletingLastPathComponent())
     }
 
-    private func destination(filename: String) throws -> URL {
+    private func destination(filename: String, extension fileExtension: String = "txt") throws -> URL {
         let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let safe = filename.components(separatedBy: CharacterSet(charactersIn: "/\\:").union(.controlCharacters)).joined(separator: "_")
-        let stem = String(safe.replacingOccurrences(of: ".txt", with: "", options: [.caseInsensitive, .anchored, .backwards]).prefix(70))
-        return folder.appendingPathComponent((stem.isEmpty ? "书籍" : stem) + ".txt")
+        let stem = String(safe.replacingOccurrences(of: "." + fileExtension, with: "", options: [.caseInsensitive, .anchored, .backwards]).prefix(70))
+        return folder.appendingPathComponent((stem.isEmpty ? "书籍" : stem) + "." + fileExtension)
     }
 }

@@ -83,6 +83,7 @@ final class ReaderViewModel: ObservableObject {
     private var continuationLoadedIndex: Int?
     @Published private(set) var scrollRetries: Set<Int> = []
     private var sourceCacheNeedsInvalidation = false
+    private var refreshAfterRuleChange = false
     private var pendingSourceContent: ChapterContentReport?
     private var cacheTask: Task<Void, Never>?
     private var cacheGeneration = 0
@@ -254,11 +255,10 @@ final class ReaderViewModel: ObservableObject {
     var usesReplaceRules: Bool { book.readConfig?.useReplaceRule ?? true }
     var currentChapterError: String? {
         guard hasLoadedCurrentChapter, !isLoading,
-              content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               currentChapter?.isVolume != true else { return nil }
         return scrollChapters.first(where: { $0.id == currentIndex })?.error
             ?? diagnostics.first(where: { $0.severity == .error })?.message
-            ?? (source != nil ? "当前书源没有返回正文。" : nil)
+            ?? (source != nil && content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "当前书源没有返回正文。" : nil)
     }
 
     func bookForSourceSwitch(position: Int) -> Book {
@@ -322,6 +322,8 @@ final class ReaderViewModel: ObservableObject {
 
     func load(rules: [ReplaceRule], forceRefresh: Bool = false, prefetchNextChapter: Bool = true) async {
         guard !isLoading else { return }
+        let forceRefresh = forceRefresh || refreshAfterRuleChange
+        refreshAfterRuleChange = false
         if !content.isEmpty && !forceRefresh {
             if prefetchNextChapter, let source { schedulePreload(after: currentIndex, source: source) }
             return
@@ -389,7 +391,7 @@ final class ReaderViewModel: ObservableObject {
             book: book,
             chapter: effectiveChapter,
             content: report.content,
-            rules: rules
+            rules: usesReplaceRules ? rules : []
         )
         title = processed.title
         content = processed.content
@@ -490,7 +492,7 @@ final class ReaderViewModel: ObservableObject {
             book: book,
             chapter: effectiveChapter,
             content: report.content,
-            rules: rules
+            rules: usesReplaceRules ? rules : []
         )
         let error = (report.diagnostics + processed.diagnostics).first(where: { $0.severity == .error })?.message
             ?? (processed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && source != nil && !chapter.isVolume
@@ -534,13 +536,14 @@ final class ReaderViewModel: ObservableObject {
             book: book,
             chapter: effectiveChapter,
             content: report.content,
-            rules: rules
+            rules: usesReplaceRules ? rules : []
         ).content
         return value.isEmpty ? nil : value
     }
 
     @discardableResult
-    func toggleReplaceRules() -> Book {
+    func toggleReplaceRules(position: Int? = nil) -> Book {
+        if isLoading { refreshAfterRuleChange = true }
         var config = book.readConfig ?? BookReadConfig()
         config.useReplaceRule = !usesReplaceRules
         book.readConfig = config
@@ -551,6 +554,9 @@ final class ReaderViewModel: ObservableObject {
         loadedFromCache = false
         hasLoadedCurrentChapter = false
         clearAdjacentChapters()
+        if let position { requestedPosition = max(position, 0) }
+        isLoading = false
+        chapterLoadGeneration &+= 1
         return book
     }
 

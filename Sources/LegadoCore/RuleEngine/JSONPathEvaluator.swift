@@ -17,6 +17,48 @@ public struct JSONPathEvaluator: Sendable {
 
     public init() {}
 
+    // Legado's JSON rules also allow literal templates such as /book/{$.id}.
+    // Balance braces and quoted strings instead of stopping at the first }.
+    func evaluateRule(_ rule: String, in root: JSONValue) throws -> [JSONValue] {
+        var cursor = rule.startIndex
+        var output = ""
+        var foundTemplate = false
+        while let opening = rule.range(of: "{$.", range: cursor..<rule.endIndex) {
+            foundTemplate = true
+            output += rule[cursor..<opening.lowerBound]
+            let start = rule.index(after: opening.lowerBound)
+            var end = start
+            var depth = 1
+            var quote: Character?
+            var escaped = false
+            while end < rule.endIndex {
+                let character = rule[end]
+                if escaped { escaped = false }
+                else if character == "\\" { escaped = true }
+                else if let activeQuote = quote {
+                    if character == activeQuote { quote = nil }
+                } else if character == "\"" || character == "'" { quote = character }
+                else if character == "{" { depth += 1 }
+                else if character == "}" {
+                    depth -= 1
+                    if depth == 0 { break }
+                }
+                end = rule.index(after: end)
+            }
+            guard end < rule.endIndex else {
+                throw RuleEngineError.malformedRule(rule: rule, detail: "JSONPath 模板大括号未闭合")
+            }
+            let values = try evaluate(path: String(rule[start..<end]), in: root)
+            output += RuleEvaluation(values: values).strings.joined(separator: "\n")
+            cursor = rule.index(after: end)
+        }
+        if foundTemplate {
+            output += rule[cursor...]
+            return [.string(output)]
+        }
+        return try evaluate(path: rule.hasPrefix("$") ? rule : "$." + rule, in: root)
+    }
+
     public func evaluate(path: String, in root: JSONValue) throws -> [JSONValue] {
         let segments = try parse(path)
         var current = [root]
@@ -59,7 +101,10 @@ public struct JSONPathEvaluator: Sendable {
                 guard next < rule.endIndex else {
                     throw RuleEngineError.malformedRule(rule: path, detail: "JSONPath 不能以点结尾")
                 }
-                if rule[next] == "." {
+                if rule[next] == "[" {
+                    // Legacy sources use $.[*] as well as $[*].
+                    index = next
+                } else if rule[next] == "." {
                     index = rule.index(after: next)
                     let parsed = try parseDotSelector(rule, from: index, original: path)
                     segments.append(.recursive(parsed.selector))

@@ -49,7 +49,7 @@ struct BackupSyncView: View {
 
     private var fileBackupSection: some View {
         Section {
-                Toggle("包含本地 TXT 书籍", isOn: $includesLocalBooks)
+                Toggle("包含本地 TXT / EPUB 书籍", isOn: $includesLocalBooks)
                 Toggle("包含已缓存正文", isOn: $includesCachedChapters)
                 Button {
                     Task { await model.export(localBooks: includesLocalBooks, cachedChapters: includesCachedChapters) }
@@ -97,7 +97,7 @@ struct BackupSyncView: View {
                     } message: { Text("停止自动同步并移除本机保存的凭据，保留本机和云端数据。") }
             }
         } header: { Text("WebDAV") } footer: {
-            Text("兼容坚果云等 WebDAV 服务。自动同步用于合并进度；自动备份保存可恢复的历史副本。云端不包含本地 TXT 和正文缓存，完整迁移请导出文件备份。")
+            Text("兼容坚果云等 WebDAV 服务。自动同步用于合并进度；自动备份保存可恢复的历史副本。云端不包含本地 TXT / EPUB 和正文缓存，完整迁移请导出文件备份。")
         }
         .disabled(model.isWorking)
     }
@@ -127,7 +127,7 @@ struct BackupSyncView: View {
                 if !model.googleConfigured { Text("Google 绑定将在应用登录配置完成后可用。").foregroundStyle(.secondary) }
             }
         } header: { Text("Google Drive") } footer: {
-            Text("通过 Google 官方登录授权，仅访问本应用的专用备份空间。每次备份单独保存，可选择旧备份预览并合并恢复；不包含本地 TXT 和正文缓存。")
+            Text("通过 Google 官方登录授权，仅访问本应用的专用备份空间。每次备份单独保存，可选择旧备份预览并合并恢复；不包含本地 TXT / EPUB 和正文缓存。")
         }
         .disabled(model.isWorking || model.googleRestoring)
     }

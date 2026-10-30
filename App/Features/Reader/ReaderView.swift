@@ -4,6 +4,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct ReaderView: View {
+    private var usesEPUBLayout = true
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -18,6 +19,7 @@ struct ReaderView: View {
     @StateObject private var speech = ReaderSpeechController()
     @State private var showsTableOfContents = false
     @State private var showsBookmarks = false
+    @State private var illustrationChapter: BookChapter?
     @State private var showsAutoReadControls = false
     @State private var showsStyleControls = false
     @State private var isAutoReading = false
@@ -143,7 +145,8 @@ struct ReaderView: View {
         ))
     }
 
-    init(book: Book, chapters: [BookChapter], initialIndex: Int) {
+    init(book: Book, chapters: [BookChapter], initialIndex: Int, usesEPUBLayout: Bool = true) {
+        self.usesEPUBLayout = usesEPUBLayout
         _pageAnimation = State(initialValue: book.readConfig?.pageAnim.flatMap { $0 >= 0 ? $0 : nil }
             ?? Self.globalPageAnimation())
         _model = StateObject(wrappedValue: ReaderViewModel(
@@ -214,6 +217,14 @@ struct ReaderView: View {
 
 
     var body: some View {
+        if usesEPUBLayout, book.origin == "local", URL(string: book.bookUrl)?.pathExtension.lowercased() == "epub" {
+            EPUBReaderView(book: book, chapters: model.chapters, initialIndex: model.currentIndex)
+        } else {
+            textReaderBody
+        }
+    }
+
+    private var textReaderBody: some View {
         readerCanvas
         .preferredColorScheme(resolvedStyle.id == "night" ? .dark : .light)
         .readingTabBarHidden()
@@ -306,6 +317,9 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $showsTableOfContents) { tableOfContents }
         .sheet(isPresented: $showsBookmarks) { bookmarksSheet }
+        .sheet(item: $illustrationChapter) { chapter in
+            EPUBIllustrationsView(book: book, chapter: chapter)
+        }
         .sheet(isPresented: $showsAutoReadControls) { autoReadControls }
         .sheet(isPresented: $showsStyleControls) { styleControls }
         .sheet(isPresented: $showsContentSearch) { contentSearchSheet }
@@ -517,11 +531,13 @@ struct ReaderView: View {
                 .frame(maxWidth: .infinity)
             }
             .overlay(alignment: .bottom) {
-                if pageAnimation == 3, let error = model.currentChapterError, !showsReaderMenu {
+                if let error = model.currentChapterError, !showsReaderMenu {
                     VStack(spacing: 10) {
-                        Text("本章加载失败").font(.subheadline.weight(.semibold))
+                        Text(model.content.isEmpty ? "本章加载失败" : "本章加载不完整").font(.subheadline.weight(.semibold))
                         Text(error).font(.caption).lineLimit(2).multilineTextAlignment(.center)
                         readerRecoveryActions
+                        Button("打开阅读菜单") { showsReaderMenu = true }
+                            .accessibilityIdentifier("reader.failureMenu")
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity)
@@ -774,6 +790,7 @@ struct ReaderView: View {
             || showsReaderMenu
             || showsTableOfContents
             || showsBookmarks
+            || illustrationChapter != nil
             || showsAutoReadControls
             || showsStyleControls
             || showsContentSearch
@@ -966,6 +983,12 @@ struct ReaderView: View {
             Button("搜索正文", systemImage: "magnifyingglass") {
                 showsReaderMenu = false
                 showsContentSearch = true
+            }
+            if book.origin == "local", URL(string: book.bookUrl)?.pathExtension.lowercased() == "epub" {
+                Button("本章插图", systemImage: "photo.on.rectangle") {
+                    showsReaderMenu = false
+                    illustrationChapter = model.currentChapter
+                }
             }
             Button("书签列表", systemImage: "bookmark") {
                 showsReaderMenu = false
@@ -1759,10 +1782,9 @@ struct ReaderView: View {
             showsContentEditor = true
         case 9:
             showsReaderMenu = false
-            let updatedBook = model.toggleReplaceRules()
+            let updatedBook = model.toggleReplaceRules(position: readerPosition)
             Task {
                 await library.addOrUpdate(updatedBook)
-                await model.load(rules: model.usesReplaceRules ? replaceRules.rules : [])
             }
         case 10:
             showsReaderMenu = false
@@ -1901,7 +1923,7 @@ struct ReaderView: View {
                     Text("正文")
                 } footer: {
                     if !model.canEditContent {
-                        Text("本地 TXT 直接来自原文件；为避免破坏章节偏移，本章编辑与网络刷新仅对网络书籍开放。")
+                        Text("本地 TXT / EPUB 直接读取原文件。本章编辑与网络刷新仅对网络书籍开放。")
                     }
                 }
 
@@ -2588,7 +2610,8 @@ private actor ReaderPagedBoundaryTestLoader: ChapterContentLoading {
 
 private struct ReaderFailureTestLoader: ChapterContentLoading {
     func loadContent(book: Book, chapter: BookChapter, source: BookSource, nextChapterURL: String?, maxPages: Int) async -> ChapterContentReport {
-        .init(diagnostics: [.init(severity: .error, code: "content.request", message: "测试书源正文请求失败", rule: chapter.url)])
+        .init(content: ProcessInfo.processInfo.arguments.contains("-uiReaderPartialFailure") ? "本章只加载了第一页正文。" : "",
+              diagnostics: [.init(severity: .error, code: "content.request", message: "测试书源正文请求失败", rule: chapter.url)])
     }
 }
 #endif

@@ -66,6 +66,33 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: target.directory.appendingPathComponent("LocalBooks").path).count == 1)
     }
 
+    @Test func localEPUBArchivePreservesBytesAndRetargetsChapterURLs() async throws {
+        let original = try Fixture(); let target = try Fixture()
+        defer { original.cleanup(); target.cleanup() }
+        let file = original.directory.appendingPathComponent("LocalBooks/archive-fixture.epub")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Archive transport treats the EPUB as opaque bytes; EPUB parsing has its own tests.
+        let bytes = Data("synthetic EPUB attachment bytes".utf8)
+        try bytes.write(to: file)
+        var value = LibrarySnapshot()
+        value.books = [.init(bookUrl: file.absoluteString, name: "备份格式测试")]
+        value.chapters[file.absoluteString] = [.init(url: file.absoluteString + "#chapter-1",
+            title: "第一章", bookUrl: file.absoluteString, index: 0)]
+        try await original.service.apply(value, expected: original.service.snapshot())
+        let url = try await original.service.export(includeLocalBooks: true, includeCachedChapters: false)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let prepared = try await target.service.prepare(url)
+        defer { try? FileManager.default.removeItem(at: prepared.directory) }
+        try await target.service.restore(prepared)
+        let restored = try await target.service.snapshot()
+        let book = try #require(restored.books.first)
+        let restoredURL = try #require(URL(string: book.id))
+        #expect(restoredURL.pathExtension == "epub")
+        #expect(try Data(contentsOf: restoredURL) == bytes)
+        #expect(restored.chapters[book.id]?.first?.url == book.id + "#chapter-1")
+        #expect(restored.chapters[book.id]?.first?.bookUrl == book.id)
+    }
+
     @Test func metadataExportOmitsLocalBooksAndCacheAttachments() async throws {
         let fixture = try Fixture(); defer { fixture.cleanup() }
         var value = snapshot(); value.books.append(.init(bookUrl: "file:///not-in-backup.txt", name: "本地书"))

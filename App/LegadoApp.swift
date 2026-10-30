@@ -58,6 +58,7 @@ struct LegadoApp: App {
                     await bookLibrary.load()
                     await replaceRuleLibrary.load()
                     await readingActivity.load()
+                    await rssLibrary.load()
                     await ruleSubscriptions.load()
                     if UserDefaults.standard.bool(forKey: "auto_refresh") {
                         await bookLibrary.checkForUpdates(sources: sourceLibrary.sources, onlyRead: UserDefaults.standard.bool(forKey: "onlyUpdateRead"))
@@ -100,6 +101,15 @@ struct LegadoApp: App {
                 .onOpenURL { url in
                     if GoogleBackupAccount.handle(url) { return }
                     Task {
+                        if url.isFileURL && url.pathExtension.lowercased() == "epub" {
+                            let file = LocalBookImportFile(url: url)
+                            await bookLibrary.load()
+                            await bookLibrary.importPickedLocalFiles([file])
+                            sourceLibrary.notice = .init(kind: bookLibrary.errorMessage == nil ? .success : .error,
+                                                         title: bookLibrary.errorMessage == nil ? "EPUB 已加入书架" : "导入失败",
+                                                         detail: bookLibrary.errorMessage ?? url.lastPathComponent)
+                            return
+                        }
                         await sourceLibrary.load()
                         if url.scheme?.lowercased() == "legado", url.path.lowercased() == "/replacerule" {
                             await replaceRuleLibrary.load()

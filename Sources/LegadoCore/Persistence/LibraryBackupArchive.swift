@@ -119,7 +119,7 @@ public enum LibraryBackupArchive {
                   parts[1].dropLast(5).allSatisfy({ $0.isHexDigit || $0 == "-" }) else {
                 throw LibraryBackupError.invalid("正文缓存附件不正确")
             }
-        } else if !parts[1].lowercased().hasSuffix(".txt") { throw LibraryBackupError.invalid("本地书格式不正确") }
+        } else if !["txt", "epub"].contains(URL(fileURLWithPath: String(parts[1])).pathExtension.lowercased()) { throw LibraryBackupError.invalid("本地书格式不正确") }
     }
 
     private static func read(_ input: FileHandle, count: Int) throws -> Data {
@@ -230,7 +230,7 @@ public actor LibraryBackupService {
                 if local, !incoming.books.contains(where: { $0.origin == "local" && URL(string: $0.id)?.lastPathComponent == source.lastPathComponent }) { continue }
                 var stem = source.deletingPathExtension().lastPathComponent
                 while stem.utf8.count > 180 { stem.removeLast() }
-                let target = local ? support.appendingPathComponent("LocalBooks/\(stem)-\(attachment.checksum.prefix(12)).txt") : cache.appendingPathComponent(source.lastPathComponent)
+                let target = local ? support.appendingPathComponent("LocalBooks/\(stem)-\(attachment.checksum.prefix(12)).\(source.pathExtension.lowercased())") : cache.appendingPathComponent(source.lastPathComponent)
                 if !FileManager.default.fileExists(atPath: target.path) {
                     try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                     let staging = target.deletingLastPathComponent().appendingPathComponent(".restore-\(UUID().uuidString)")

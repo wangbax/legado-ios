@@ -115,9 +115,9 @@ public struct ContentSanitizer: Sendable {
         var diagnostics: [RuleDiagnostic] = []
 
         for rule in ordered where rule.scopeTitle && applies(rule, to: book) {
-            let result = apply(rule, to: title)
+            let result = apply(rule, to: title, book: book, chapter: chapter)
             diagnostics += result.diagnostics
-            if result.value != title {
+            if result.value != title, !result.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 title = result.value
                 effective.append(rule.id)
             }
@@ -146,7 +146,7 @@ public struct ContentSanitizer: Sendable {
         }
 
         for rule in ordered where rule.scopeContent && applies(rule, to: book) {
-            let result = apply(rule, to: body)
+            let result = apply(rule, to: body, book: book, chapter: chapter)
             diagnostics += result.diagnostics
             if result.value != body {
                 body = result.value
@@ -172,10 +172,16 @@ public struct ContentSanitizer: Sendable {
         return (!book.name.isEmpty && scope.contains(book.name)) || (!book.origin.isEmpty && scope.contains(book.origin))
     }
 
-    private func apply(_ rule: ReplaceRule, to input: String) -> (value: String, diagnostics: [RuleDiagnostic]) {
+    private func apply(_ rule: ReplaceRule, to input: String, book: Book, chapter: BookChapter) -> (value: String, diagnostics: [RuleDiagnostic]) {
         guard !rule.pattern.isEmpty else { return (input, []) }
         do {
             if rule.isRegex {
+                if rule.replacement.hasPrefix("@js:") {
+                    let evaluate = JavaScriptRuleEvaluator().replacementEvaluator(
+                        script: String(rule.replacement.dropFirst(4)), book: book, chapter: chapter)
+                    return (try regex.replacingStrict(pattern: rule.pattern, in: input,
+                        timeoutMilliseconds: rule.timeoutMillisecond, replacement: evaluate), [])
+                }
                 return (try regex.replacingStrict(pattern: rule.pattern, in: input, with: rule.replacement, timeoutMilliseconds: rule.timeoutMillisecond), [])
             }
             return (input.replacingOccurrences(of: rule.pattern, with: rule.replacement), [])

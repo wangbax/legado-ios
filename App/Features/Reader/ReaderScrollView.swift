@@ -129,7 +129,8 @@ struct ReaderScrollView: UIViewRepresentable {
                 let layout = view.collectionViewLayout as! ReaderContinuousLayout
                 let geometry = ReaderContinuousLayout.geometry(
                     blocks: newBlocks, width: view.bounds.width,
-                    top: CGFloat(config.paddingTop), bottom: CGFloat(config.paddingBottom), viewportHeight: view.bounds.height
+                    top: CGFloat(config.paddingTop), bottom: CGFloat(config.paddingBottom),
+                    viewportHeight: view.bounds.height, scale: view.traitCollection.displayScale
                 )
                 let targetY = anchor.flatMap { offset(for: $0, blocks: newBlocks, frames: geometry.frames) }
                 let correction = targetY.map { $0 - view.contentOffset.y } ?? 0
@@ -277,28 +278,23 @@ struct ReaderScrollView: UIViewRepresentable {
         private func captureAnchor() -> Anchor? {
             guard let view, !blocks.isEmpty else { return nil }
             let layout = view.collectionViewLayout as! ReaderContinuousLayout
-            let y = max(view.contentOffset.y, layout.frames.first?.minY ?? 0)
-            // UIKit snaps content offsets to physical pixels; TextKit's chapter
-            // boundaries can fall between them. A subpixel remainder belongs
-            // to the heading now visible, rather than the preceding chapter.
-            let scale = view.window?.screen.scale ?? view.traitCollection.displayScale
-            let pixel = 1 / max(scale, 1)
-            guard let row = layout.row(at: y + pixel) else { return nil }
+            // The reading position starts below the configured top padding.
+            // Preserve that reference point when earlier chapters are inserted.
+            let y = max(view.contentOffset.y + CGFloat(max(parent.configuration.paddingTop, 0)),
+                        layout.frames.first?.minY ?? 0)
+            let scale = max(view.traitCollection.displayScale, 1)
+            guard let row = layout.row(at: (y * scale).rounded() / scale) else { return nil }
             let block = blocks[row], chapter = block.chapter
             let localY = max(y - layout.frames[row].minY, 0) + block.top
             let glyph = chapter.manager.glyphIndex(for: CGPoint(x: 0, y: localY + 0.5), in: chapter.container)
             let safeGlyph = min(glyph, max(chapter.manager.numberOfGlyphs - 1, 0))
             let character = chapter.manager.characterIndexForGlyph(at: safeGlyph)
             let lineY = chapter.manager.lineFragmentRect(forGlyphAt: safeGlyph, effectiveRange: nil).minY
-            // Do not carry the rounding remainder into each subsequent prepend;
-            // many short chapters would otherwise accumulate a visible offset.
-            let anchorOffset = abs(y - layout.frames[row].minY) <= pixel
-                ? layout.frames[row].minY : view.contentOffset.y
             return Anchor(
                 chapter: chapter.chapter.id,
                 position: min(max(character - chapter.bodyStart, 0), chapter.chapter.content.utf16.count),
                 inHeading: character < chapter.bodyStart,
-                screenY: layout.frames[row].minY + lineY - block.top - anchorOffset
+                screenY: layout.frames[row].minY + lineY - block.top - view.contentOffset.y
             )
         }
 
@@ -398,17 +394,21 @@ final class ReaderContinuousLayout: UICollectionViewLayout {
     private var size = CGSize.zero
     override var collectionViewContentSize: CGSize { size }
 
-    static func geometry(blocks: [ReaderScrollBlock], width: CGFloat, top: CGFloat, bottom: CGFloat, viewportHeight: CGFloat) -> (frames: [CGRect], size: CGSize) {
-        var y = top
+    static func geometry(blocks: [ReaderScrollBlock], width: CGFloat, top: CGFloat, bottom: CGFloat, viewportHeight: CGFloat, scale: CGFloat) -> (frames: [CGRect], size: CGSize) {
+        let scale = max(scale, 1)
+        // Keep insertion offsets in whole physical pixels. UIKit rounds scroll
+        // offsets, so fractional chapter heights otherwise accumulate drift.
+        var pixels = (top * scale).rounded()
         let frames = blocks.map { block -> CGRect in
-            let frame = CGRect(x: 0, y: y, width: width, height: block.height)
-            y += block.height
+            let height = ceil(block.height * scale)
+            let frame = CGRect(x: 0, y: pixels / scale, width: width, height: height / scale)
+            pixels += height
             return frame
         }
         let finalChapter = blocks.last?.chapter.chapter.id
         let finalStart = blocks.indices.first(where: { blocks[$0].chapter.chapter.id == finalChapter })
             .map { frames[$0].minY } ?? top
-        return (frames, CGSize(width: width, height: max(y, finalStart + viewportHeight) + bottom))
+        return (frames, CGSize(width: width, height: max(pixels / scale, finalStart + viewportHeight) + bottom))
     }
 
     func install(frames: [CGRect], size: CGSize, correction: CGFloat) {
@@ -425,9 +425,9 @@ final class ReaderContinuousLayout: UICollectionViewLayout {
         var low = 0, high = frames.count
         while low < high {
             let middle = (low + high) / 2
-            if frames[middle].maxY <= y { low = middle + 1 } else { high = middle }
+            if frames[middle].minY <= y { low = middle + 1 } else { high = middle }
         }
-        return min(low, frames.count - 1)
+        return max(low - 1, 0)
     }
 
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {

@@ -207,7 +207,7 @@ struct ReadingPhotoPickerController: UIViewControllerRepresentable {
     }
 }
 
-private struct ReadingTXTFileImporterModifier: ViewModifier {
+private struct ReadingLocalBookFileImporterModifier: ViewModifier {
     @Binding var isPresented: Bool
     let onFiles: ([LocalBookImportFile]) -> Void
     let onError: (Error) -> Void
@@ -219,7 +219,7 @@ private struct ReadingTXTFileImporterModifier: ViewModifier {
             pickerHasDismissed = true
             deliverFilesWhenReady()
         }) {
-            ReadingTXTFilePicker { files in
+            ReadingLocalBookFilePicker { files in
                 pickedFiles = files
                 isPresented = false
                 deliverFilesWhenReady()
@@ -239,7 +239,7 @@ private struct ReadingTXTFileImporterModifier: ViewModifier {
         guard pickerHasDismissed, !pickedFiles.isEmpty else { return }
         let files = pickedFiles
         pickedFiles = []
-        guard files.allSatisfy({ $0.url.pathExtension.lowercased() == "txt" && !$0.url.hasDirectoryPath }) else {
+        guard files.allSatisfy({ LocalBookService.supports($0.url) && !$0.url.hasDirectoryPath }) else {
             onError(LocalBookError.unsupportedFormat)
             return
         }
@@ -247,15 +247,16 @@ private struct ReadingTXTFileImporterModifier: ViewModifier {
     }
 }
 
-private struct ReadingTXTFilePicker: UIViewControllerRepresentable {
+private struct ReadingLocalBookFilePicker: UIViewControllerRepresentable {
     let onPick: @MainActor ([LocalBookImportFile]) -> Void
     let onCancel: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        // Plain text includes UTF-8/UTF-16 TXT, while .text and .data also allow JSON.
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText], asCopy: true)
+        // Keep source JSON out of the local-book picker.
+        let epub = UTType(filenameExtension: "epub") ?? UTType(importedAs: "org.idpf.epub-container")
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText, epub], asCopy: true)
         picker.allowsMultipleSelection = true
         picker.shouldShowFileExtensions = true
         picker.delegate = context.coordinator
@@ -266,9 +267,9 @@ private struct ReadingTXTFilePicker: UIViewControllerRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let parent: ReadingTXTFilePicker
+        let parent: ReadingLocalBookFilePicker
 
-        init(parent: ReadingTXTFilePicker) { self.parent = parent }
+        init(parent: ReadingLocalBookFilePicker) { self.parent = parent }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { parent.onCancel() }
 
@@ -281,12 +282,12 @@ private struct ReadingTXTFilePicker: UIViewControllerRepresentable {
 enum ReadingSheetDetent { case medium, large }
 
 extension View {
-    func readingTXTFileImporter(
+    func readingLocalBookFileImporter(
         isPresented: Binding<Bool>,
         onFiles: @escaping ([LocalBookImportFile]) -> Void,
         onError: @escaping (Error) -> Void
     ) -> some View {
-        modifier(ReadingTXTFileImporterModifier(isPresented: isPresented, onFiles: onFiles, onError: onError))
+        modifier(ReadingLocalBookFileImporterModifier(isPresented: isPresented, onFiles: onFiles, onError: onError))
     }
 
     func readingPhotoPicker(

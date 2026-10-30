@@ -52,8 +52,12 @@ public struct RuleExpressionParser: Sendable {
         guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RuleEngineError.malformedRule(rule: source, detail: "规则不能为空")
         }
-        let split = try splitAtTopLevel(normalized)
-        let branches = try split.parts.map { try parseBranch($0, inputLooksLikeJSON: inputLooksLikeJSON) }
+        // ## belongs to the whole selector stage. Regex/replacement text may
+        // contain quotes, brackets and && that are not selector operators.
+        let replacementStart = normalized.range(of: "##")?.lowerBound ?? normalized.endIndex
+        let split = try splitAtTopLevel(String(normalized[..<replacementStart]))
+        let suffix = String(normalized[replacementStart...])
+        let branches = try split.parts.map { try parseBranch($0 + suffix, inputLooksLikeJSON: inputLooksLikeJSON) }
         return .init(source: source, combination: split.combination, branches: branches)
     }
 

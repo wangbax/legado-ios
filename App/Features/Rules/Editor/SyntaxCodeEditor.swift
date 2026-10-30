@@ -62,7 +62,12 @@ struct SyntaxCodeEditor: UIViewRepresentable {
         }
         let completionItems: [UIBarButtonItem] = [UIBarButtonItem(systemItem: .flexibleSpace), UIBarButtonItem(title: "完成", primaryAction: UIAction(title: "", subtitle: nil) { [weak view] _ in view?.resignFirstResponder() })]
         bar.items = editingItems + symbolItems + completionItems
-        view.inputAccessoryView = bar
+        bar.items?.last?.accessibilityIdentifier = "syntaxCodeEditor.done"
+        if #available(iOS 26.0, *) {
+            view.inputAccessoryView = CodeInputAccessory(items: bar.items ?? [])
+        } else {
+            view.inputAccessoryView = bar
+        }
         view.text = text
         context.coordinator.highlight(view)
         return view
@@ -185,6 +190,66 @@ struct SyntaxCodeEditor: UIViewRepresentable {
             view.typingAttributes = [.font: UIFont.monospacedSystemFont(ofSize: 14, weight: .regular), .foregroundColor: UIColor.label]
         }
     }
+}
+
+// Keep Done visible while allowing the editing shortcuts to scroll on narrow keyboards.
+private final class CodeInputAccessory: UIInputView {
+    init(items: [UIBarButtonItem]) {
+        super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44), inputViewStyle: .keyboard)
+        autoresizingMask = [.flexibleWidth]
+        backgroundColor = .secondarySystemGroupedBackground
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.delaysContentTouches = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let actions = items.filter { $0.primaryAction != nil }
+        var done: UIButton?
+        for (index, item) in actions.enumerated() {
+            let button = UIButton(type: .system)
+            if let action = item.primaryAction { button.addAction(action, for: .touchUpInside) }
+            button.setImage(item.image, for: .normal)
+            button.setTitle(item.title, for: .normal)
+            button.tintColor = UIColor(ReadingTheme.accent)
+            button.titleLabel?.font = .systemFont(ofSize: 16)
+            button.accessibilityIdentifier = item.accessibilityIdentifier
+            button.accessibilityLabel = item.accessibilityLabel
+            button.translatesAutoresizingMaskIntoConstraints = false
+            if index == actions.count - 1 {
+                button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+                done = button
+                addSubview(button)
+            } else {
+                if index < 3 { button.accessibilityLabel = ["查找与替换", "撤销", "重做"][index] }
+                stack.addArrangedSubview(button)
+                button.widthAnchor.constraint(equalToConstant: 36).isActive = true
+            }
+        }
+        addSubview(scroll)
+        scroll.addSubview(stack)
+        guard let done else { return }
+        NSLayoutConstraint.activate([
+            done.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            done.widthAnchor.constraint(equalToConstant: 60),
+            done.topAnchor.constraint(equalTo: topAnchor),
+            done.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            scroll.trailingAnchor.constraint(equalTo: done.leadingAnchor, constant: -4),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            stack.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override var intrinsicContentSize: CGSize { CGSize(width: UIView.noIntrinsicMetric, height: 44) }
 }
 
 struct RuleCodeFieldView: View {

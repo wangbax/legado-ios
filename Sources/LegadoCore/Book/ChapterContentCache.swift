@@ -268,10 +268,8 @@ public actor ChapterContentCoordinator {
         maxPages: Int = 20,
         forceRefresh: Bool = false
     ) async -> CoordinatedChapterContent {
-        if forceRefresh {
-            cancelRequests(bookURL: book.bookUrl)
-            try? await cache.remove(bookURL: book.bookUrl, chapterURL: chapter.url)
-        } else if let cached = try? await cache.load(bookURL: book.bookUrl, chapterURL: chapter.url),
+        if forceRefresh { cancelRequests(bookURL: book.bookUrl) }
+        if !forceRefresh, let cached = try? await cache.load(bookURL: book.bookUrl, chapterURL: chapter.url),
                   cached.sourceID == nil || cached.sourceID == source.id {
             return .init(report: .init(
                 title: cached.title,
@@ -323,7 +321,8 @@ public actor ChapterContentCoordinator {
     }
 
     public func saveContent(_ report: ChapterContentReport, book: Book, chapter: BookChapter, source: BookSource) async {
-        if !report.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !Task.isCancelled, !report.diagnostics.contains(where: { $0.severity == .error }),
+           !report.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             try? await cache.save(.init(
                 bookURL: book.bookUrl,
                 chapterURL: chapter.url,
