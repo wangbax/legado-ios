@@ -11,6 +11,8 @@
 
 在线书源、专用浏览页、网站导入适配及测试集中在 `feat(personal): retain online source catalogs in the fork` 提交中。投稿分支没有功能开关、隐藏入口或内置网站列表。
 
+2026-11-04 的复审进一步要求移除内置 QQ 阅读规则和打开换源时的书名自动查询。投稿分支已移除这两项，只对用户已导入的起点候选做匿名公开片段核验。自用 `main` 原有的 QQ 参照能力保留在 `feat(personal): retain automatic public-reference lookups` 提交中；两边均拒绝独立参照 URL 中的请求选项和脚本，并使旧参照缓存失效。
+
 ## 同步修复
 
 共用功能的修复先在投稿分支提交，再将该提交 cherry-pick 到 `main`；避免将整个 `main` 合并回投稿分支，以免重新带入自用功能。提交继续附带 Codex 的 `Co-authored-by` 标记。
