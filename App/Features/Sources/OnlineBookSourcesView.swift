@@ -196,7 +196,7 @@ final class OnlineSourceBrowser: NSObject, ObservableObject, WKNavigationDelegat
     }
 
     private func routeImport(_ url: URL) -> Bool {
-        guard RuleImportInput.isDeepLink(url) else { return false }
+        guard RuleImportInput.isDeepLink(url, for: "bookSource") else { return false }
         guard let onImport, !isImporting else { return true }
         isImporting = true
         Task {

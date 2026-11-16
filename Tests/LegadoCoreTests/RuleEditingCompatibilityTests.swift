@@ -94,7 +94,7 @@ struct RuleEditingCompatibilityTests {
     @Test func yueduImportLinksPreserveRemoteURLsAndRequestOptions() throws {
         let remote = "https://cdn.mgz.la/shuyuan/250701%E6%9C%80%E5%90%8E%E4%B8%80%E7%89%88%E4%B8%80%E7%A8%8B.json"
         let catalogLink = "yuedu://booksource/importonline?src=" + remote
-        #expect(RuleImportInput.isDeepLink(try #require(URL(string: catalogLink))))
+        #expect(RuleImportInput.isDeepLink(try #require(URL(string: catalogLink)), for: "bookSource"))
         #expect(try RuleImportInput.parse(catalogLink) == .remote(URL(string: remote)!, withoutUserAgent: false))
 
         let encoded = "YUEDU://bookSource/importOnline?src=https%3A%2F%2Fexample.test%2Fsources.json%3Fname%3D%E4%B9%A6%E6%BA%90%26page%3D2%23requestWithoutUA"
@@ -114,7 +114,7 @@ struct RuleEditingCompatibilityTests {
         ] {
             #expect(throws: BookSourceImportError.self) { try RuleImportInput.parse(link) }
         }
-        #expect(!RuleImportInput.isDeepLink(URL(string: "yuedu://rsssource/importonline?src=https://example.test/rss.json")!))
+        #expect(!RuleImportInput.isDeepLink(URL(string: "yuedu://rsssource/importonline?src=https://example.test/rss.json")!, for: "bookSource"))
     }
 
     @Test func purificationTestMatchesReaderScopesAndCaptures() throws {
